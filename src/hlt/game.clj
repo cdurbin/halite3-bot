@@ -17,6 +17,7 @@
 
 (def MOVE_COST 0.1)
 (def GATHER_AMOUNT 0.25)
+(def CELL_HALITE_LEFT_BEHIND 0.75)
 (def MAX_HALITE_CARRY 1000)
 (def DROPOFF_COST 4000)
 (def INSPIRED_BONUS 2)
@@ -392,3 +393,9 @@
   "Returns true if it is a two player game."
   [world]
   (= 2 (:num-players world)))
+
+(defn enough-spawn-halite?
+  "Returns true if I have enough halite to spawn a ship."
+  [world constants]
+  (let [{:keys [my-player reserve]} world]
+    (>= (:halite my-player) (+ (get constants "NEW_ENTITY_ENERGY_COST") reserve))))
