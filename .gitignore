@@ -1,0 +1,15 @@
+/replays
+/target
+/classes
+/checkouts
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/.lein-*
+/.nrepl-port
+*.log
+halite.old
+/deploy
+replay*
+flog*
