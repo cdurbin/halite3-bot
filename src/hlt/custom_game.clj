@@ -540,3 +540,46 @@
                    7 seven-range-neighbors
                    :inspiration inspiration-neighbors}]
     (assoc cell :neighbors neighbors)))
+
+(defn build-world-for-round
+  "Builds up the world for the current round."
+  [world last-round-other-player-ships turns-to-start-crashing]
+  (let [{:keys [last-turn my-id cells other-shipyards width height my-shipyard num-players
+                last-spawn-turn last-dropoff-turn]} world
+        turn (Integer/parseInt (read-line))
+        _ (log "Turn" turn)
+        ; _ (log "Last round ships" last-round-ships)
+        turns-left (- last-turn turn)
+        players (doall (for [i (range num-players)]
+                         (load-player)))
+        my-player (first (filter #(= my-id (:player-id %)) players))
+        other-players (remove #(= my-id (:player-id %)) players)
+        updated-cells (load-updated-cells)
+        cells (merge-updated-cells cells updated-cells)
+        total-halite (reduce + (map :halite (vals cells)))
+        total-ship-count (reduce + (map #(count (:ships %))
+                                        players))
+        total-ship-count (inc total-ship-count)
+        total-other-ship-halite (- (reduce + (map :halite (mapcat :ships players)))
+                                   (reduce + (map :halite (:ships my-player))))
+        enemy-dropoffs (concat other-shipyards (mapcat :dropoffs other-players))
+        world {:width width :height height :players players :my-player my-player :cells cells
+               :turn turn :last-spawn-turn last-spawn-turn :turns-left turns-left
+               :last-dropoff-turn last-dropoff-turn :my-shipyard my-shipyard
+               :num-players num-players :my-ship-count (count (:ships my-player))
+               :total-halite total-halite :total-ship-count total-ship-count
+               :enemy-dropoffs enemy-dropoffs :total-other-ship-halite total-other-ship-halite
+               :my-id my-id :updated-cells updated-cells :other-players other-players}
+        ship-location-map (build-ship-location-map world (> turns-left turns-to-start-crashing))
+        world (assoc world :ship-location-map ship-location-map)
+        other-player-ships (mapcat :ships other-players)
+        changed-locations (get-changed-locations-for-ships last-round-other-player-ships
+                                                           other-player-ships)
+        potential-locations (set (mapcat #(get-locations-in-inspiration-range world %)
+                                         changed-locations))
+        ; _ (log "Changed locations are:" changed-locations)
+        ; _ (log "Potential locations are:" potential-locations)
+        inspire-update-cells (map #(inspire-cell world % ship-location-map) potential-locations)
+        cells (combine-cells inspire-update-cells cells)]
+    (assoc world :updated-cells updated-cells :potential-locations potential-locations
+          :other-player-ships other-player-ships :cells cells)))

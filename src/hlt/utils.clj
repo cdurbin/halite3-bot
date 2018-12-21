@@ -76,8 +76,21 @@
                    (clj-time/time-zone-for-offset 0)))]
         (apply println (conj args time))))))
 
+
 (def flog-file
   (clj-io/writer (str "flog" bot-name) :append false))
+
+(defn init-flog
+  []
+  (binding [*out* flog-file]
+    (println "[")))
+
+(defn setup-logging
+  "Sets up logging if required."
+  [args]
+  (when (= "-log" (first args))
+    (reset! log-stuff true)
+    (init-flog)))
 
 (defn flog
   ([world location msg]
@@ -112,11 +125,6 @@
                                                  {:t (:turn world)
                                                   :msg msg})))]
          (println line ","))))))
-
-(defn init-flog
-  []
-  (binding [*out* flog-file]
-    (println "[")))
 
 (defn remove-item
   "Removes the item from a collection."

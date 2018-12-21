@@ -1,5 +1,5 @@
-(ns hlt.core
-  "Core functionality for Halite 3."
+(ns hlt.old-core
+  "My old bot."
   (:require
    [cheshire.core :as json]
    [clojure.set :as set]
@@ -279,7 +279,7 @@
 
 (defn should-spawn?
   "Returns true if player can spawn a turtle."
-  [world shipyard]
+  [world shipyard constants]
   (when (and (enough-spawn-halite? world)
              (safe-location? world nil shipyard))
     (let [{:keys [turn last-dropoff-turn players my-player cells num-players total-halite
@@ -843,50 +843,128 @@
                                                  (get-cells-within-two-range world location)))))]
             [location turns]))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; The main loop
 (defn -main
   "Main"
   [& args]
-  (setup-logging args)
-  (let [world (load-world)
-        {:keys [my-shipyard cells width height num-players my-id other-shipyards]} world
-        cells (map #(add-neighbors world %) (vals cells))
-        cells (decorate-cells world cells [my-shipyard])
+  (when (= "-log" (first args))
+    (reset! log-stuff true)
+    (init-flog))
+  (let [constants (json/parse-string (read-line))
+        [num-players my-id] (map #(Integer/parseInt %)
+                                 (string/split (read-line) #" "))
+        shipyards (doall (for [player (range num-players)
+                               :let [[id x y] (string/split (read-line) #" ")]]
+                           {:player-id (Integer/parseInt id)
+                            :x (Integer/parseInt x)
+                            :y (Integer/parseInt y)}))
+        my-shipyard (first (filter #(= my-id (:player-id %)) shipyards))
+        other-shipyards (remove #(= my-id (:player-id %)) shipyards)
+        [width-str height-str] (string/split (read-line) #" ")
+        width (Integer/parseInt width-str)
+        height (Integer/parseInt height-str)
+        cells (load-cells height)
+        initial-world {:height height :width width :cells cells}
+        cells (map #(add-neighbors initial-world %) (vals cells))
+        cells (build-cell-map cells)
+        cells (decorate-cells initial-world
+                              (vals cells)
+                              [my-shipyard])
         last-turn (total-turns height width)
         last-spawn-turn (* last-turn (get last-spawn-turn-pct num-players))
-        last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
-        world (assoc world
-                     :last-turn last-turn :last-spawn-turn last-spawn-turn
-                     :last-dropoff-turn last-dropoff-turn)]
+        last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)]
     (println bot-name)
+    (log constants)
+    (log "Num players" num-players)
+    (log "My player id" my-id)
+    (log "Shipyards" (pr-str shipyards))
+    (log (format "Width %s, height %s" width height))
     (loop [cells cells
            last-round-ships nil
            last-round-other-player-ships nil
            last-dropoff-location nil
            banned-cells nil]
-      (let [world (build-world-for-round (assoc world :cells cells) last-round-other-player-ships
-                                         TURNS_TO_START_CRASHING)
-            {:keys [ship-location-map potential-locations updated-cells my-player turns-left
-                    players turn cells other-players
-                    potential-locations other-player-ships]} world
+      (let [
+            turn (Integer/parseInt (read-line))
+            _ (log "Turn" turn)
+            ; _ (log "Last round ships" last-round-ships)
+            turns-left (- last-turn turn)
+            players (doall (for [i (range num-players)]
+                             (load-player)))
+            my-player (first (filter #(= my-id (:player-id %)) players))
+            other-players (remove #(= my-id (:player-id %)) players)
+            updated-cells (load-updated-cells)
+            cells (merge-updated-cells cells updated-cells)
+            total-halite (reduce + (map :halite (vals cells)))
+            total-ship-count (reduce + (map #(count (:ships %))
+                                            players))
+            total-ship-count (inc total-ship-count)
+            total-other-ship-halite (- (reduce + (map :halite (mapcat :ships players)))
+                                       (reduce + (map :halite (:ships my-player))))
+            enemy-dropoffs (concat other-shipyards (mapcat :dropoffs other-players))
+            world {:width width :height height :players players :my-player my-player :cells cells
+                   :turn turn :last-spawn-turn last-spawn-turn :turns-left turns-left
+                   :last-dropoff-turn last-dropoff-turn :my-shipyard my-shipyard
+                   :num-players num-players :my-ship-count (count (:ships my-player))
+                   :total-halite total-halite :total-ship-count total-ship-count
+                   :enemy-dropoffs enemy-dropoffs :total-other-ship-halite total-other-ship-halite
+                   :my-id my-id}
+            ship-location-map (build-ship-location-map world (> turns-left TURNS_TO_START_CRASHING))
+            world (assoc world :ship-location-map ship-location-map)
+            ; update-inspiration-cells (find-potentially-updated-inspiration-cells world old-ship-locations)
+            ; nearby-cells (map #(inspire-cell world % ship-location-map) nearby-cells)
+            ; nearby-cells (build-cell-map (map #(inspire-cell world % ship-location-map) nearby-cells))
+
+            other-players (remove #(= (:player-id %) (:player-id my-player))
+                                  (:players world))
+            other-player-ships (mapcat :ships other-players)
+            changed-locations (get-changed-locations-for-ships last-round-other-player-ships
+                                                               other-player-ships)
+            potential-locations (set (mapcat #(get-locations-in-inspiration-range world %)
+                                             changed-locations))
+
+            ; _ (log "Changed locations are:" changed-locations)
+            ; _ (log "Potential locations are:" potential-locations)
+            inspire-update-cells (map #(inspire-cell world % ship-location-map) potential-locations)
+            cells (combine-cells inspire-update-cells cells)
+            world (assoc world :cells cells)
+            world (if (> turns-left TURNS_TO_START_CRASHING)
+                    (predict-enemy-ship-locations world ship-location-map)
+                    world)
             score-potential-locations (mapcat #(get-locations-in-inspiration-range world %)
                                               updated-cells)
             score-potential-locations (set (concat score-potential-locations
                                                    (mapcat #(get-locations-in-inspiration-range world %)
                                                            potential-locations)))
-            ;; ## IMPORTANT - must be done prior to scoring cells
-            world (if (> (:turns-left world) TURNS_TO_START_CRASHING)
-                    (predict-enemy-ship-locations world ship-location-map)
-                    world)
+            ; _ (log "Locations that could have a different score are:" (pprint/pprint score-potential-locations logger))
             score-potential-cells (map #(get-location world % STILL) score-potential-locations)
             updated-cell-map (decorate-cells world
                                              score-potential-cells
                                              (conj (:dropoffs my-player) my-shipyard))
-            cells (merge cells updated-cell-map)
+            optimized-cells (merge cells updated-cell-map)
 
+            ; original-cells (decorate-cells {:height height :width width :cells cells}
+            ;                                (vals cells)
+            ;                                (conj (:dropoffs my-player) my-shipyard))
+            ;
+            ; differences (for [cell (vals cells)
+            ;                   :let [optimized-cell (get optimized-cells (select-keys cell [:x :y]))
+            ;                         original-cell (get original-cells (select-keys cell [:x :y]))]
+            ;                   :when (not= optimized-cell original-cell)]
+            ;               (str "Cells" (select-keys cell [:x :y]) "was a problem with score:"
+            ;                    (:score optimized-cell) "Vs score:" (:score original-cell)))
+            ;               ; (data/diff optimized-cell original-cell))
+            ;
+            ; _ (log "Differences are: " differences)
+            ; _ (log "Differences are: " (pprint/pprint differences logger))
+
+            cells optimized-cells
+            ; _ (when (= turn 6)
+            ;     (System/exit 1))
             _ (doseq [cell (filter :inspired (vals cells))]
                 (flog world (select-keys cell [:x :y]) "Inspired")) ;:yellow))
+
+            ; _ (log "Turn " turn "Inspired cells are:" (map #(select-keys % [:x :y])
+            ;                                                (filter :inspired (vals cells))))
             world (assoc world :cells cells)
             [top-cells uninspired-cells] (get-top-cells world PERCENT_TOP_CELLS)
             min-top-cell-score (if (empty? top-cells)
@@ -941,6 +1019,18 @@
                              (- DROPOFF_COST (apply max 500 (map :halite dropoff-locations)))
                              0)
             world (assoc world :reserve halite-to-save)
+            ; world (if (> turns-left TURNS_TO_START_CRASHING)
+            ;         (predict-enemy-ship-locations world ship-location-map)
+            ;         world)
+            ; _ (doseq [cell (filter #(ghost-ship? (:ship %))
+            ;                        (vals (:cells world)))]
+            ;     (flog world cell "GHOST" :white))
+            ; _ (log "After predictions here are the enemy ships on the map"
+            ;        (filterv #(not= (:player-id my-player) (:owner %))
+            ;                 (->> world
+            ;                      :cells
+            ;                      vals
+            ;                      (keep :ship))))
             banned-cells (remove-one-turn-from-banned-cells world banned-cells)
             _ (doseq [cell (keys banned-cells)]
                 (flog world cell "Banned cell" :green))
@@ -959,18 +1049,35 @@
                                          dropoff-location)
             other-ships (get-my-ships-that-can-move stuck-ships my-player)
             other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
+            ; surrounded-ships (filter #(surrounded-ship? world % ship-location-map) other-ships)
+            ; other-ships (get-my-ships-that-can-move (concat stuck-ships surrounded-ships) my-player)
+            ; other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
+            ; other-ships (map (fn [ship]
+            ;                    (assoc ship :mode (get-mode ship
+            ;                                                (get-location world ship STILL)
+            ;                                                (:turns-left world))))
+            ;                  other-ships)
+            ; collecting-ships (sort (compare-by :cell-halite desc)
+            ;                        (filter #(= :collect (:mode %)) other-ships))
             collecting-ships (sort (compare-by :halite desc)
                                    (filter #(= :collect (:mode %)) other-ships))
+            ; collecting-ships (sort (compare-by :dropoff-distance desc :cell-halite desc)
+            ;                        (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))
+
+            ;; XXX not sure if I want to do this yet
+            other-ships (sort (compare-by :halite desc) other-ships)
             {:keys [world moves]} (get-moves-and-world world (concat stuck-ships
+                                                                     ;; surrounded-ships
+                                                                     ; other-ships))
                                                                      dropoff-ships
                                                                      collecting-ships))
             [world moves] (if (> (:turns-left world) TURNS_TO_START_CRASHING)
                             (unwind-collisions world moves)
                             [world moves])
             world (update-world-for-dropoff-ship world dropoff-ship)
-            spawn-command (get-spawn-command (should-spawn? world my-shipyard))
+            spawn-command (get-spawn-command (should-spawn? world my-shipyard constants))
             dropoff-command (get-dropoff-command dropoff-ship)
             cells-without-ships (into {}
                                   (map (fn [[k v]]
@@ -988,9 +1095,22 @@
             (flog world (:ship move) (:reason move))))
         (log "My output:" (str spawn-command (string/join " " (map generate-move-command moves))))
         (log "Stuck ships:" (map :id stuck-ships))
+        ; (log "Surrounded ships:" surrounded-ships)
+        (log "Cells with ships are:" (map #(select-keys % [:x :y])
+                                          (filter :ship (-> world :cells vals))))
         (log "Turn " turn "logging all moves.")
         (println (str spawn-command " "
                       dropoff-command " "
                       (string/join " " (map generate-move-command moves))))
         (recur cells-without-ships last-round-ships other-player-ships dropoff-location
                (:banned-cells world))))))
+
+(comment
+ (let [world {:cells {{:x 1 :y 2} {:x 1 :y 3 :halite 55}
+                      {:x 3 :y 5} {:x 3 :y 5 :ship "oh my" :halite 122}}}
+       locations {"n" {:x 1 :y 2}
+                  "s" {:x 3 :y 5}}]
+   (keep (fn [[k v]]
+           (when (safe-location? world nil v)
+             k))
+         locations)))

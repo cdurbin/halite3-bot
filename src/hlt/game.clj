@@ -2,6 +2,7 @@
   "Functions that should almost never change. Just the fundamental rules of the game."
   (:require
    [clojure.string :as string]
+   [cheshire.core :as json]
    [hlt.utils :refer :all]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -19,6 +20,7 @@
 (def GATHER_AMOUNT 0.25)
 (def CELL_HALITE_LEFT_BEHIND 0.75)
 (def MAX_HALITE_CARRY 1000)
+(def SHIP_COST 1000)
 (def DROPOFF_COST 4000)
 (def INSPIRED_BONUS 2)
 (def INSPIRE_SHIPS_NEEDED 2)
@@ -394,8 +396,34 @@
   [world]
   (= 2 (:num-players world)))
 
+; (defn enough-spawn-halite?
+;   "Returns true if I have enough halite to spawn a ship."
+;   [world constants]
+;   (let [{:keys [my-player reserve]} world]
+;     (>= (:halite my-player) (+ (get constants "NEW_ENTITY_ENERGY_COST") reserve))))
+
 (defn enough-spawn-halite?
   "Returns true if I have enough halite to spawn a ship."
-  [world constants]
+  [world]
   (let [{:keys [my-player reserve]} world]
-    (>= (:halite my-player) (+ (get constants "NEW_ENTITY_ENERGY_COST") reserve))))
+    (>= (:halite my-player) (+ SHIP_COST reserve))))
+
+(defn load-world
+  "Loads the inital world before the start of the first round."
+  []
+  (let [constants (json/parse-string (read-line))
+        [num-players my-id] (map #(Integer/parseInt %)
+                                 (string/split (read-line) #" "))
+        shipyards (doall (for [player (range num-players)
+                               :let [[id x y] (string/split (read-line) #" ")]]
+                           {:player-id (Integer/parseInt id)
+                            :x (Integer/parseInt x)
+                            :y (Integer/parseInt y)}))
+        my-shipyard (first (filter #(= my-id (:player-id %)) shipyards))
+        other-shipyards (remove #(= my-id (:player-id %)) shipyards)
+        [width-str height-str] (string/split (read-line) #" ")
+        width (Integer/parseInt width-str)
+        height (Integer/parseInt height-str)
+        cells (load-cells height)]
+    {:num-players num-players :my-id my-id :my-shipyard my-shipyard :width width :height height
+     :cells cells}))
