@@ -172,6 +172,16 @@
         other-carry-amount (- (reduce + (map #(get-capacity %) other-ships)) (get-capacity their-ship))]
     [my-carry-amount other-carry-amount]))
 
+(defn get-carrying-capacity
+  "Returns a tuple of my nearby carrying capacity and enemy nearby carrying capacity."
+  [world ships]
+  (let [my-id (:my-id world)
+        my-ships (filter #(= my-id (:owner %)) ships)
+        my-carry-amount (reduce + (map #(get-capacity %) my-ships))
+        other-ships (remove #(= my-id (:owner %)) ships)
+        other-carry-amount (reduce + (map #(get-capacity %) other-ships))]
+    [my-carry-amount other-carry-amount]))
+
 (defn get-inspire-opponent-count
   "Returns the number of ships with a different owner within inspiration range."
   [world ship]
@@ -226,16 +236,18 @@
   [world ship cell]
   ; (if-not (two-player? world)
   ;   0
-  (let [original-cell (get-location world ship STILL)
-        cost (- (get-opponent-extra-inspire-by-move world original-cell cell)
-                (get-opponent-lost-inspire-by-move world original-cell cell))]
-    (if (not= 0 cost)
-      (do (log "Turn:" (:turn world) "There's a move to reduce the inspiration - cost was" cost "and cell" (select-keys cell [:x :y]))
-          (flog world cell (str "Inspiration cost:" cost) :brown)
-          (if (> (Math/abs ^Integer cost) 5)
-            cost
-            0))
-      cost)))
+  (let [original-cell (get-location world ship STILL)]
+    (if (= (select-keys original-cell [:x :y]) (select-keys cell [:x :y]))
+      0
+      (let [cost (- (get-opponent-extra-inspire-by-move world original-cell cell)
+                    (get-opponent-lost-inspire-by-move world original-cell cell))]
+        (if (not= 0 cost)
+          (do (log "Turn:" (:turn world) "There's a move to reduce the inspiration - cost was" cost "and cell" (select-keys cell [:x :y]))
+              (flog world cell (str "Inspiration cost:" cost) :brown)
+              (if (> (Math/abs ^Integer cost) 5)
+                cost
+                0))
+          cost)))))
 
 (defn banned-cell?
   "Returns true if the cell has been banned for dropoff ships."
@@ -408,6 +420,14 @@
             world
             bases)))
 
+(defn get-closest-cell
+  "Returns the closest cell to a target from a list of cells."
+  [world target cells]
+  (let [distance-maps (for [cell cells
+                            :let [distance (distance-between (:width world) (:height world) cell target)]]
+                        {:distance distance :cell cell})]
+    (first (sort (compare-by :distance asc) distance-maps))))
+
 (defn find-closest-ship
   "Returns the closest ship to given target from a list of ships"
   [world target ships]
@@ -447,8 +467,8 @@
 
 (defn inspired-cell?
   "Returns true if the cell is inspired."
-  [world cell ship-location-map]
-  (let [my-id (:my-id world)]
+  [world cell]
+  (let [{:keys [my-id ship-location-map]} world]
     (loop [inspire-count 0
            remaining-cells (-> cell :neighbors :inspiration)]
       (let [ship (get ship-location-map (first remaining-cells))
@@ -462,9 +482,9 @@
 (defn inspire-cell
   "Adds a bonus halite to a cell if the cell would be inspired based on the current enemy ship
   locations."
-  [world location ship-location-map]
+  [world location]
   (let [cell (get-location world location STILL)
-        inspired? (inspired-cell? world cell ship-location-map)]
+        inspired? (inspired-cell? world cell)]
     (assoc cell :inspired inspired?)))
 
 (defn get-changed-locations-for-ships
@@ -579,7 +599,39 @@
                                          changed-locations))
         ; _ (log "Changed locations are:" changed-locations)
         ; _ (log "Potential locations are:" potential-locations)
-        inspire-update-cells (map #(inspire-cell world % ship-location-map) potential-locations)
+        inspire-update-cells (map #(inspire-cell world %) potential-locations)
         cells (combine-cells inspire-update-cells cells)]
     (assoc world :updated-cells updated-cells :potential-locations potential-locations
           :other-player-ships other-player-ships :cells cells)))
+
+(defn unwind-collisions
+  "Any time there is a collision try to back out moves until there is no longer a collision."
+  [world moves moves-fn max-rewinds]
+  (loop [iteration 0
+         updated-world world
+         updated-moves moves]
+    (let [colliding-ships (get-colliding-ships updated-world updated-moves)]
+      (log "Turn" (:turn world) "Iteration " iteration "Colliding ships are" (mapv :id colliding-ships))
+      (if (or (empty? colliding-ships) (>= iteration max-rewinds))
+        [updated-world updated-moves]
+        (let [{:keys [world moves]} (remove-moves-with-collisions
+                                     updated-world updated-moves colliding-ships)
+              all-hitters (set (keep :hitter colliding-ships))
+              ; _ (log "All hitter ids" (map :id all-hitters))
+              ; _ (log "All hitters" all-hitters)
+              all-causes (set (keep :cause colliding-ships))
+              ; _ (log "All causes" (map :id all-causes))
+              all-pre-causes (set (keep :pre-cause colliding-ships))
+              ; _ (log "All pre-causes" (map :id all-pre-causes))
+              ; _ (log "All causes" all-causes)
+              all-hitters (set/difference all-hitters all-causes all-pre-causes)
+              all-causes (set/difference all-causes all-pre-causes)
+              ; _ (log "Set difference" (map :id all-hitters))
+              {world :world new-moves :moves} (moves-fn world (concat all-hitters all-causes all-pre-causes))
+             ; _ (log "Old moves (which should have removed new move IDs)." (map generate-move-command moves))
+              next-round-of-moves (concat moves new-moves)]
+          ; (log "CDD: New moves:" new-moves)
+          ; (log "CDD: New moves with collisions" (filter :collision new-moves))
+          ; (log "CDD: All remaining moves with collisions" (filter :collision next-round-of-moves))
+          ; (log "New moves:" (map generate-move-command new-moves))
+          (recur (inc iteration) world next-round-of-moves))))))

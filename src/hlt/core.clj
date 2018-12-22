@@ -9,7 +9,8 @@
    [hlt.utils :refer :all]
    [hlt.game :refer :all]
    [hlt.custom-game :refer :all]
-   [hlt.dropoffs :refer :all])
+   [hlt.dropoffs :refer :all]
+   [hlt.collisions :refer :all])
   (:gen-class))
 
 (set! *warn-on-reflection* true)
@@ -23,7 +24,7 @@
 (def MIN_DROPOFF_DISTANCE 4)
 (def PERCENT_TOP_CELLS 12)
 (def TOP_SCORE_DELTA 200)
-(def TURNS_TO_START_CRASHING 8)
+; (def TURNS_TO_START_CRASHING 8)
 
 (def last-spawn-turn-pct
   {2 0.52
@@ -57,209 +58,10 @@
       56 880
       64 860}})
 
-(def MIN_CRASH_FOR_HALITE 350)
-(def CRASH_TURNS_LEFT 25)
+
 (def DELTA_CARRY 500)
-(def FOUR_PLAYER_HALITE_TO_CRASH 250)
-
-(defn ram-makes-sense?
-  "Returns true if I should even consider ramming."
-  [world]
-  true)
-
-(defn get-cost-to-ram
-  "Returns the cost for the ship to ram another one."
-  [world ship cell]
-  (let [current-cell (get-location world ship STILL)]
-    (+
-       ; (:halite ship)
-       (* MOVE_COST (:halite current-cell))
-       (* GATHER_AMOUNT (+ (:halite current-cell) (get-bonus current-cell)))
-       (if (two-player? world)
-         (get-inspire-delta-by-move world ship cell)
-         (if (or (little-halite-left? world MIN_CRASH_FOR_HALITE) (< (:turns-left world) CRASH_TURNS_LEFT))
-           0
-           (/ (:total-halite world) (:total-ship-count world)))))))
-
-(defn ram-makes-sense-based-on-carry-capacity?
-  "Returns true if it makes sense."
-  [my-carry-amount other-carry-amount my-ship their-ship]
-  (and (> my-carry-amount
-          (+ (:halite their-ship) (get-bonus their-ship)))
-       (> my-carry-amount
-          (+ (:halite my-ship) (get-bonus my-ship)))))
-       ; (> my-carry-amount (+ DELTA_CARRY other-carry-amount))))
-
+(def MAX_REWINDS 30)
 (def NUM_BAN_TURNS 7)
-
-(defn should-ram-aggressive?
-  "Returns true if I should intentionally try to crash into an enemy."
-  [world my-ship cell]
-  (let [{:keys [my-id]} world
-        ship-in-cell (:ship cell)
-        their-ship (when (and ship-in-cell
-                              (not= my-id (:owner ship-in-cell))
-                              (not= GHOST (:owner ship-in-cell)))
-                     ship-in-cell)]
-    (when their-ship
-      (log "should-ram?: my-ship " (:id my-ship) "their ship" (:id their-ship)))
-    (and their-ship
-         (not (at-enemy-dropoff? world cell))
-         (or
-             (let [[my-carry-amount other-carry-amount] (get-six-range-carrying-capacity
-                                                         world cell my-ship their-ship)
-                   cost-to-ram (get-cost-to-ram world my-ship cell)]
-               (and
-                    ; (> (:halite their-ship) (:halite my-ship))
-                    (> my-carry-amount other-carry-amount)
-                    (< cost-to-ram (* GATHER_AMOUNT (+ (:halite their-ship) (get-bonus their-ship))))
-                    (least-halite-ramming-ship? world cell my-ship)
-                    (or (two-player? world)
-                        (and (ram-makes-sense-based-on-carry-capacity?
-                              my-carry-amount other-carry-amount my-ship their-ship)
-                             (> (:halite their-ship) (:halite my-ship))
-                             (> (:halite their-ship) FOUR_PLAYER_HALITE_TO_CRASH)))))))))
-
-(defn all-out-ram?
-  "Returns true if I should get really aggressive with ramming."
-  [world]
-  (let [{:keys [total-halite total-ship-count turns-left]} world]
-    (or (two-player? world))))
-        ; (little-halite-left? world)
-        ; (<= turns-left CRASH_TURNS_LEFT))))
-
-(defn should-ram?
-  "Returns true if I should intentionally try to crash into an enemy."
-  [world my-ship cell]
-  (if (all-out-ram? world)
-    (should-ram-aggressive? world my-ship cell)
-  ; (when (ram-makes-sense? world)
-    (let [{:keys [my-id]} world
-          ship-in-cell (:ship cell)
-          their-ship (when (and ship-in-cell
-                                (not= my-id (:owner ship-in-cell))
-                                (not= GHOST (:owner ship-in-cell)))
-                       ship-in-cell)]
-      (when their-ship
-        (log "should-ram?: my-ship " (:id my-ship) "their ship" (:id their-ship)))
-      (and their-ship
-           (not (at-enemy-dropoff? world cell))
-           (and (or (two-player? world)
-                    (let [[my-carry-amount other-carry-amount] (get-two-range-carrying-capacity
-                                                                world cell my-ship their-ship)]
-                      (> my-carry-amount other-carry-amount)))
-
-                (let [[my-carry-amount other-carry-amount] (get-six-range-carrying-capacity
-                                                            world cell my-ship their-ship)
-                      cost-to-ram (get-cost-to-ram world my-ship cell)]
-                  (and
-                       ;; (> (:halite their-ship) (:halite my-ship))
-                       (> my-carry-amount other-carry-amount)
-                       (or (and (two-player? world)
-                                (or (:inspired cell)
-                                    (> (:halite their-ship) (:halite my-ship)))
-                                (> my-carry-amount (+ other-carry-amount (:halite my-ship))))
-                           (> my-carry-amount (+ other-carry-amount cost-to-ram)))
-                       (< cost-to-ram (min my-carry-amount
-                                           (+ (:halite their-ship)
-                                              (get-bonus their-ship)
-                                              (get-bonus my-ship))))
-                       (least-halite-ramming-ship? world cell my-ship)
-                       (or
-                           (two-player? world)
-                           (and (ram-makes-sense-based-on-carry-capacity?
-                                 my-carry-amount other-carry-amount my-ship their-ship))))))))))
-
-(def RAM_DANGER_MIN_HALITE 0)
-
-(defn ram-danger?
-  "Returns true if my ship might get rammed."
-  [world ship cell]
-  (let [{:keys [total-halite total-ship-count turns-left my-id]} world]
-    (and ship
-         (> turns-left TURNS_TO_START_CRASHING)
-         (> (:dropoff-distance cell) 0)
-         (>= (:halite ship) RAM_DANGER_MIN_HALITE)
-         (let [surrounding-cells (get-surrounding-cells world cell)
-               enemies-in-reach (keep #(when (and %
-                                                  (not= GHOST (:id %))
-                                                  (not= my-id (:owner %))
-                                                  (can-move? world %))
-                                                   ; (< (:halite %) (:halite ship)))
-                                         %)
-                                      (map :ship surrounding-cells))
-               enemy-ship (:ship cell)
-               enemy-in-cell (when (and enemy-ship
-                                        (not= GHOST (:id ship))
-                                        (not= my-id (:owner ship)))
-                               enemy-ship)
-               enemies-in-reach (if enemy-in-cell
-                                  (conj enemies-in-reach enemy-in-cell)
-                                  enemies-in-reach)]
-           ; (log "CDD: turn" (:turn world) "cell" (dissoc cell :neighbors) "enemies-in-reach" enemies-in-reach "for ship" ship)
-           (and (or (surrounded-on-three-sides-and-four-player? world cell)
-                    (seq enemies-in-reach))
-                (or
-                    (let [nearby-ships (get-six-range-ships world cell)
-                          my-id (-> world :my-player :player-id)
-                          my-ships (filter #(= my-id (:owner %)) nearby-ships)
-                          my-carry-amount (- (reduce + (map #(get-capacity %) my-ships)) (:halite ship))
-                          other-ships (remove #(= my-id (:owner %)) nearby-ships)
-                          ; other-carry-amount (- (reduce + (map #(get-capacity %) other-ships)) (:halite their-ship))                      other-ships (remove #(= my-id (:owner %)) nearby-ships)
-                          other-carry-amount (reduce + (map #(get-capacity %) other-ships))]
-                      ; (log "Ram danger check for ship" ship "and cell" (dissoc cell :neighbors) "my ship count" (count my-ships)
-                           ; "other ship count" (- (count nearby-ships) (count my-ships))]
-                      (or (at-enemy-dropoff? world cell)
-                          ; (>= (count other-ships) (count my-ships))
-                          (and (< my-carry-amount other-carry-amount)
-                               (or (surrounded-on-three-sides-and-four-player? world cell)
-                                   (< (apply min MAX_HALITE_CARRY (map :halite enemies-in-reach))
-                                      (:halite ship))))))
-                    (and
-                         ;; (not (two-player? world))
-                         (let [nearby-ships (get-two-range-ships world cell)
-                               my-id (-> world :my-player :player-id)
-                               my-ships (filter #(= my-id (:owner %)) nearby-ships)
-                               my-carry-amount (- (reduce + (map #(get-capacity %) my-ships)) (:halite ship))
-                               other-ships (remove #(= my-id (:owner %)) nearby-ships)
-                               ; other-carry-amount (- (reduce + (map #(get-capacity %) other-ships)) (:halite their-ship))                      other-ships (remove #(= my-id (:owner %)) nearby-ships)
-                               other-carry-amount (reduce + (map #(get-capacity %) other-ships))]
-                           ; (log "Ram danger check for ship" ship "and cell" (dissoc cell :neighbors) "my ship count" (count my-ships)
-                                ; "other ship count" (- (count nearby-ships) (count my-ships))]
-                           (or
-                               ; (>= (count other-ships) (count my-ships))
-                               (at-enemy-dropoff? world cell)
-                               (and (< my-carry-amount other-carry-amount)
-                                    (or (surrounded-on-three-sides-and-four-player? world cell)
-                                        (< (apply min MAX_HALITE_CARRY (map :halite enemies-in-reach))
-                                           (:halite ship)))))))))))))
-
-(defn safe-location?
-  "Returns true if I can move to the location without crashing."
-  [world ship location]
-  (let [cell (get (:cells world) (select-keys location [:x :y]))
-        other-ship (:ship cell)
-        safe? (or (and (<= (:turns-left world) TURNS_TO_START_CRASHING)
-                       (= 0 (:dropoff-distance cell)))
-                  (and (not (ram-danger? world ship cell))
-                       (or (and (nil? other-ship)
-                                (<= (:dropoff-distance cell) (:turns-left world)))
-                           (should-ram? world ship cell))))]
-    safe?))
-
-(defn safe-ignoring-ghost-ships?
-  "Returns true if I can move the location without crashing into my own ships."
-  [world ship location]
-  (let [cell (get (:cells world) (select-keys location [:x :y]))]
-    (or (and (nil? (:ship cell))
-             (<= (:dropoff-distance cell) (:turns-left world))
-             (not (ram-danger? world ship cell)))
-        (and (< (:turns-left world) TURNS_TO_START_CRASHING)
-             (= 0 (:dropoff-distance cell)))
-        (and (ghost-ship? (:ship cell))
-             (not (at-enemy-dropoff? world cell))
-                 ; (not (ram-danger? world ship cell)))
-             (<= (:dropoff-distance cell) (:turns-left world))))))
 
 (def get-steal-amount-by-map-size
   {32 1.0
@@ -480,7 +282,7 @@
           (let [current-cell (get-location world ship STILL)
                 nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)
                                    :let [cell (get-location world location STILL)]
-                                   :when (safe-location? world ship cell)
+                                   :when (nil? (:ship cell))
                                    :let [mining-info (turns-to-full-mining world ship cell)]]
                                (merge mining-info cell))
                 target (first (sort (compare-by :turns asc :halite-carried desc :dropoff-distance desc)
@@ -528,48 +330,57 @@
   (let [banned-cells (:banned-cells world)
         surrounding-cells (for [direction ALL_DIRECTIONS]
                             (assoc (get-location world ship direction) :direction direction))
-        allowed-cells (remove #(banned-cell? % banned-cells) surrounding-cells)
-        safe-cells (filter #(safe-location? world ship %) allowed-cells)
-        best-choice (->> safe-cells
-                         (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
-                                                 (get-inspire-delta-by-move world ship %)
-                                                 (- (* 2000 (/ 1 (+ 0.5 (:dropoff-distance %))))))))
-                         (sort (compare-by :cost asc :dropoff-distance asc))
-                         ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
-                         first)
-        ; safe-cells (if (and (> (:my-ship-count world) MIN_SHIPS_BEFORE_IGNORE_GHOST)
-        ;                     (or (nil? best-choice)
-        ;                         (= STILL (:direction best-choice))))
-        ;              (filter #(safe-ignoring-ghost-ships? world ship %) surrounding-cells)
-        ;              safe-cells)
-        ; blocked? (blocked-by-enemy? world best-choice ship surrounding-cells)
-        blocked? (blocked-by-enemy? world best-choice ship)
-        best-choice (if (and blocked? (= STILL (:direction best-choice)))
-                      (->> safe-cells
-                           (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
-                                                   (get-inspire-delta-by-move world ship %)
-                                                   (- (* 2000 (/ 1 (+ 0.5 (:dropoff-distance %))))))))
-                           (sort (compare-by :cost asc :dropoff-distance asc))
-                           ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
-                           first)
-                      best-choice)
-        best-choice (when best-choice
-                      (assoc best-choice :ship ship))
-        banned-cells (when (and blocked? best-choice)
-                       (assoc banned-cells
-                              (select-keys (get-location world ship STILL) [:x :y]) NUM_BAN_TURNS))]
-        ; best-choice (->> safe-cells
-        ;                  (sort (compare-by :dropoff-distance asc :halite asc))
-        ;                  first)
-        ; best-choice (when best-choice
-        ;               (assoc best-choice :ship ship))]
-    ; (log "Safe cells for dropoff move are: " safe-cells)
-    (if (and best-choice blocked?)
-      (assoc best-choice :reason "best dropoff choice, but had to ban a direction"
-             :banned-cells banned-cells)
-      (if best-choice
-        (assoc best-choice :reason "best dropoff choice")
-        {:ship ship :direction STILL :reason "dropoff couldn't find a good best choice"}))))
+        ram-cell (first (filter #(and
+                                      (not (ghost-ship? (:ship %)))
+                                      (should-ram? world ship %))
+                                surrounding-cells))]
+   ; (if ram-cell
+   ;   (do (log "I am going to ram with ship " ship "and cell" (select-keys ram-cell [:x :y]))
+   ;       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
+   ;       (assoc ram-cell :ship ship :reason "Ramming ship."))
+     (let [
+           allowed-cells (remove #(banned-cell? % banned-cells) surrounding-cells)
+           safe-cells (filter #(safe-location? world ship %) allowed-cells)
+           best-choice (->> safe-cells
+                            (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
+                                                    (get-inspire-delta-by-move world ship %)
+                                                    (- (* 2000 (/ 1 (+ 0.5 (:dropoff-distance %))))))))
+                            (sort (compare-by :cost asc :dropoff-distance asc))
+                            ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
+                            first)
+           ; safe-cells (if (and (> (:my-ship-count world) MIN_SHIPS_BEFORE_IGNORE_GHOST)
+           ;                     (or (nil? best-choice)
+           ;                         (= STILL (:direction best-choice))))
+           ;              (filter #(safe-ignoring-ghost-ships? world ship %) surrounding-cells)
+           ;              safe-cells)
+           ; blocked? (blocked-by-enemy? world best-choice ship surrounding-cells)
+           blocked? (blocked-by-enemy? world best-choice ship)
+           best-choice (if (and blocked? (= STILL (:direction best-choice)))
+                         (->> safe-cells
+                              (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
+                                                      (get-inspire-delta-by-move world ship %)
+                                                      (- (* 2000 (/ 1 (+ 0.5 (:dropoff-distance %))))))))
+                              (sort (compare-by :cost asc :dropoff-distance asc))
+                              ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
+                              first)
+                         best-choice)
+           best-choice (when best-choice
+                         (assoc best-choice :ship ship))
+           banned-cells (when (and blocked? best-choice)
+                          (assoc banned-cells
+                                 (select-keys (get-location world ship STILL) [:x :y]) NUM_BAN_TURNS))]
+           ; best-choice (->> safe-cells
+           ;                  (sort (compare-by :dropoff-distance asc :halite asc))
+           ;                  first)
+           ; best-choice (when best-choice
+           ;               (assoc best-choice :ship ship))]
+       ; (log "Safe cells for dropoff move are: " safe-cells)
+       (if (and best-choice blocked?)
+         (assoc best-choice :reason "best dropoff choice, but had to ban a direction"
+                :banned-cells banned-cells)
+         (if best-choice
+           (assoc best-choice :reason "best dropoff choice")
+           {:ship ship :direction STILL :reason "dropoff couldn't find a good best choice"})))))
 
 (defn get-move
   "Returns a move direction"
@@ -794,39 +605,6 @@
             world
             ships-to-remove-target)))
 
-(def MAX_REWINDS 30)
-
-(defn unwind-collisions
-  "Any time there is a collision try to back out moves until there is no longer a collision."
-  [world moves]
-  (loop [iteration 0
-         updated-world world
-         updated-moves moves]
-    (let [colliding-ships (get-colliding-ships updated-world updated-moves)]
-      (log "Turn" (:turn world) "Iteration " iteration "Colliding ships are" (mapv :id colliding-ships))
-      (if (or (empty? colliding-ships) (>= iteration MAX_REWINDS))
-        [updated-world updated-moves]
-        (let [{:keys [world moves]} (remove-moves-with-collisions
-                                     updated-world updated-moves colliding-ships)
-              all-hitters (set (keep :hitter colliding-ships))
-              ; _ (log "All hitter ids" (map :id all-hitters))
-              ; _ (log "All hitters" all-hitters)
-              all-causes (set (keep :cause colliding-ships))
-              ; _ (log "All causes" (map :id all-causes))
-              all-pre-causes (set (keep :pre-cause colliding-ships))
-              ; _ (log "All pre-causes" (map :id all-pre-causes))
-              ; _ (log "All causes" all-causes)
-              all-hitters (set/difference all-hitters all-causes all-pre-causes)
-              all-causes (set/difference all-causes all-pre-causes)
-              ; _ (log "Set difference" (map :id all-hitters))
-              {world :world new-moves :moves} (get-moves-and-world world (concat all-hitters all-causes all-pre-causes))
-             ; _ (log "Old moves (which should have removed new move IDs)." (map generate-move-command moves))
-              next-round-of-moves (concat moves new-moves)]
-          ; (log "CDD: New moves:" new-moves)
-          ; (log "CDD: New moves with collisions" (filter :collision new-moves))
-          ; (log "CDD: All remaining moves with collisions" (filter :collision next-round-of-moves))
-          ; (log "New moves:" (map generate-move-command new-moves))
-          (recur (inc iteration) world next-round-of-moves))))))
 
 (defn remove-one-turn-from-banned-cells
   "Cells are banned for a set number of turns."
@@ -842,6 +620,144 @@
                                                          (not= my-id (:owner ship))))
                                                  (get-cells-within-two-range world location)))))]
             [location turns]))))
+
+; (defn get-value-of-a-ship
+;   "Note - I will want to change this at some point to take into account the average halite gained
+;   per turn divided by the number of ships. For now just base on total halite on the map and
+;   the number of ships."
+;   [world]
+;   (/ (:total-halite world) (:total-ship-count world)))
+;
+; (defn get-cost-of-wasted-turn
+;   "Returns the cost of wasting a turn by staying STILL."
+;   [world]
+;   (/ (:total-halite world) (:total-ship-count world)))
+;
+; (def odds-of-collision-still 0.2)
+; (def odds-of-collision-moving 0.1)
+;
+; (defn get-ships-in-cells
+;   "Returns ships from cells."
+;   [world locations]
+;   (keep :ship (map #(get-location world % STILL) locations)))
+;
+; (defn play-out-fight
+;   "Figure out who will collect what from a fight based on looking out up to 7 turns..."
+;   [world cell my-ship their-ship]
+;   (let [;; Include the inspiration bonus. Assume if I'm inspired they are too.
+;         dropped-halite (* (+ (:halite my-ship) (:halite their-ship))
+;                           (if (inspired-cell? world cell)
+;                             3
+;                             1))]
+;     (loop [remaining-halite dropped-halite
+;            iteration 1
+;            total-halite 0
+;            ships (remove #(or (= (:id my-ship) (:id %))
+;                               (= (:id their-ship) (:id %)))
+;                          (get-ships-in-cells (get-in cell [:neighbors 1])))]
+;       (if (or (<= remaining-halite 0)
+;               (> iteration 7))
+;         {:total total-halite :leftover remaining-halite}
+;         (let [[my-carry-capacity other-carry-capacity] (get-carrying-capacity world ships)
+;               delta (long (- my-carry-capacity other-carry-capacity))
+;               delta (if (> (Math/abs delta) remaining-halite)
+;                       (if (> delta 0)
+;                         remaining-halite
+;                         (* -1 remaining-halite))
+;                       delta)
+;               remaining-halite (- remaining-halite delta)
+;               total-halite (long (+ total-halite delta))]
+;           (recur remaining-halite
+;                  (inc iteration)
+;                  total-halite
+;                  (get-ships-in-cells (get-in cell [:neighbors (inc iteration)]))))))))
+;
+; (defn spoils-of-war
+;   "Returns a value of the net halite change from a collision. This could get complicated to
+;   track correctly, but is probably one of the most important things to get right in this game."
+;   [world my-ship cell their-ship]
+;   (let [{:keys [total leftover]} (play-out-fight world cell my-ship their-ship)]
+;     (if (= 0 leftover)
+;       total
+;       (let [my-closest-base (get-closest-cell world cell (:my-dropoffs world))
+;             their-closest-base (get-closest-cell world cell (:enemy-dropoffs world))]
+;         (if (< (:distance my-closest-base) (:distance their-closest-base))
+;           (+ total (* 0.5 leftover))
+;           (if (= (:distance my-closest-base) (:distance their-closest-base))
+;             total
+;             (- total (* 0.5 leftover))))))))
+;
+; (defn score-collision
+;   "Provides a score for choosing the given cell with regards to collision. Positive means
+;   an expected gain from a collision and negative means an expected loss from a collision."
+;   [world ship cell]
+;   (if-let [other-ship (:ship cell)]
+;     (if (= (:my-id world) (:owner other-ship))
+;       (- (* -2 (get-value-of-a-ship world)) (:halite ship) (:halite other-ship))
+;       (let [collisions-odds (if (ghost-ship? (:ship cell))
+;                               0.1
+;                               0.2)]
+;         (if (two-player? world)
+;           (* collisions-odds (spoils-of-war world ship cell other-ship))
+;           (+ (get-value-of-a-ship world)
+;              (* collisions-odds (spoils-of-war world ship cell other-ship))))))
+;     0))
+
+
+(defn score-mining
+  "Provides a score for choosing the given cell with regards to mining. All values should
+  be greater than or equal to 0."
+  [world ship cell]
+  0)
+
+(defn score-inspiration
+  "Provides a score for choosing the given cell with regards to inspiration. Positive means
+  an expected gain from inspiration and negative means an expected enemy gain from inspiration."
+  [world ship cell]
+  (get-inspire-delta-by-move world ship cell))
+
+(defn score-movement
+  "Provides a score for moving to the given cell. All values will be less than or equal to 0."
+  [world ship cell]
+  (let [current-cell (get-location world ship STILL)]
+    (if (= (select-keys current-cell [:x :y]) (select-keys cell [:x :y]))
+      0
+      (* -1 MOVE_COST (:halite current-cell)))))
+
+(defn score-movement-towards-base
+  "Provides a score for moving to the given cell. All values will be less than or equal to 0."
+  [world ship cell]
+  (let [current-cell (get-location world ship STILL)]
+    (if (= (select-keys current-cell [:x :y]) (select-keys cell [:x :y]))
+      0
+      (* -1 MOVE_COST (:halite current-cell)))))
+
+(defn score-collect-move
+  "Provides an overall score for a move attempting to try to collect halite."
+  [world ship cell mining-target]
+  (let [collision-score (score-collision world ship cell)
+        mining-score (score-mining world ship cell)
+        inspiration-score (score-inspiration world ship cell)
+        movement-score (score-movement world ship cell)
+        total (+ collision-score mining-score inspiration-score movement-score)]
+    (flog world ship (str "Collect score:" total))
+    total))
+
+(defn score-dropoff-move
+  "Provides an overall score for a move attempting to try to dropoff halite."
+  [world ship cell mining-target]
+  (let [collision-score (score-collision world ship cell)
+        inspiration-score (score-inspiration world ship cell)
+        movement-score (score-movement-towards-base world ship cell)
+        total (+ collision-score inspiration-score movement-score)]
+    (flog world ship (str "Dropoff score:" total))
+    total))
+
+
+
+        ;; Don't think this one makes sense to add (at least yet)
+        ;; target-score (score-moving-toward-target world ship cell)]))
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main loop
@@ -967,7 +883,7 @@
                                                                      dropoff-ships
                                                                      collecting-ships))
             [world moves] (if (> (:turns-left world) TURNS_TO_START_CRASHING)
-                            (unwind-collisions world moves)
+                            (unwind-collisions world moves get-moves-and-world MAX_REWINDS)
                             [world moves])
             world (update-world-for-dropoff-ship world dropoff-ship)
             spawn-command (get-spawn-command (should-spawn? world my-shipyard))

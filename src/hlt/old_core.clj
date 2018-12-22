@@ -796,7 +796,7 @@
 
 (def MAX_REWINDS 30)
 
-(defn unwind-collisions
+(defn unwind-collisions-old
   "Any time there is a collision try to back out moves until there is no longer a collision."
   [world moves]
   (loop [iteration 0
@@ -1074,7 +1074,7 @@
                                                                      dropoff-ships
                                                                      collecting-ships))
             [world moves] (if (> (:turns-left world) TURNS_TO_START_CRASHING)
-                            (unwind-collisions world moves)
+                            (unwind-collisions-old world moves)
                             [world moves])
             world (update-world-for-dropoff-ship world dropoff-ship)
             spawn-command (get-spawn-command (should-spawn? world my-shipyard constants))
