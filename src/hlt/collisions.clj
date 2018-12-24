@@ -278,19 +278,23 @@
 (defn score-collision
   "Provides a score for choosing the given cell with regards to collision. Positive means
   an expected gain from a collision and negative means an expected loss from a collision."
-  [world ship other-ship cell]
+  ([world ship cell]
+   (if (:ship cell)
+     (score-collision world ship (:ship cell) cell)
+     0))
+  ([world ship other-ship cell]
   ; (log "Turn " (:turn world) "SC: cell is" (select-keys cell [:ship :x :y]))
-  (if (= (:my-id world) (:owner other-ship))
-    (- (* -2 (get-value-of-a-ship world)) (:halite ship) (:halite other-ship))
-    (let [collisions-odds (if (ghost-ship? (:ship cell))
-                            0.1
-                            0.2)
-          battle-diff (spoils-of-war world ship cell other-ship)
-          battle-diff (- (+ battle-diff (:halite other-ship)) (:halite ship))]
-      ; (if (two-player? world)
-      (* collisions-odds battle-diff))))
-        ; (- (* collisions-odds battle-diff)
-           ; (get-value-of-a-ship world)))))
+   (if (= (:my-id world) (:owner other-ship))
+     (- (* -2 (get-value-of-a-ship world)) (:halite ship) (:halite other-ship))
+     (let [collisions-odds (if (ghost-ship? (:ship cell))
+                             0.05
+                             0.1)
+           battle-diff (spoils-of-war world ship cell other-ship)
+           battle-diff (- (+ battle-diff (:halite other-ship)) (:halite ship))]
+       ; (if (two-player? world)
+       (* collisions-odds battle-diff)))))
+         ; (- (* collisions-odds battle-diff)
+            ; (get-value-of-a-ship world)))))
 
 (defn ram-danger-new?
   ""
