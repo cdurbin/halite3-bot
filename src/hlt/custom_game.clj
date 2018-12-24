@@ -324,8 +324,23 @@
 (defn add-ship-to-cell
   "Adds a ship to a given cell."
   [cells ship location]
-  (log "ASTC: " (:id ship) "at location" (select-keys location [:x :y]))
+  ; (log "ASTC: " (:id ship) "at location" (select-keys location [:x :y]))
   (assoc-in cells [(select-keys location [:x :y]) :ship] ship))
+
+(defn inc-ship-count-for-cell
+  "Adds a ship to a given cell."
+  [cells cell]
+  (let [locations (concat [(select-keys cell [:x :y])]
+                          (get-in cell [:neighbors 1])
+                          (get-in cell [:neighbors 2])
+                          (get-in cell [:neighbors 3])
+                          (get-in cell [:neighbors 4])
+                          (get-in cell [:neighbors 5]))]
+    (reduce (fn [old-cells next-loc]
+              (update-in old-cells [next-loc :nearby-ship-count] inc))
+            cells
+            locations)))
+
 
 (defn get-stuck-ships
   "Returns ships that don't have enough halite to move."

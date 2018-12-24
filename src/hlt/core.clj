@@ -132,16 +132,40 @@
     :dropoff
     :collect))
 
+; (defn get-top-cell-target
+;   "Returns the target to move after."
+;   [world ship]
+;   (let [{:keys [width height top-cells uninspired-cells]} world
+;         cells (if (:motivated ship) top-cells uninspired-cells)
+;         field-comparison (if (:motivated ship) :score :uninspired-score)
+;         closest-target (first (sort (compare-by :distance asc field-comparison desc)
+;                                     (map #(assoc % :distance (distance-between width height ship %))
+;                                          cells)))]
+;     closest-target))
+
 (defn get-top-cell-target
   "Returns the target to move after."
   [world ship]
-  (let [{:keys [width height top-cells uninspired-cells]} world
-        cells (if (:motivated ship) top-cells uninspired-cells)
-        field-comparison (if (:motivated ship) :score :uninspired-score)
-        closest-target (first (sort (compare-by :distance asc field-comparison desc)
-                                    (map #(assoc % :distance (distance-between width height ship %))
-                                         cells)))]
-    closest-target))
+  ; (println "Choosing target - min-scoring-target is:" (:min-scoring-target world))
+  (let [{:keys [width height min-scoring-target cells top-cells]} world
+        cells (keep (fn [cell]
+                      (let [ratio (/ (:nearby-gather cell)
+                                     (inc (:nearby-ship-count cell)))]
+                        (when (and (>= ratio min-scoring-target)
+                                   (<= (distance-between width height ship cell) 20))
+                          (assoc cell :ratio ratio))))
+                            ; (>= (get-gather-amount %)
+                            ;     50))
+
+                                ; (apply max 50 (map get-gather-amount (get-surrounding-cells world %)))))
+                    (vals cells))]
+    (if (seq cells)
+      (let [best-target (first (sort (compare-by :ratio asc :nearby-ship-count asc) cells))]
+        best-target
+        (let [closest-target (first (sort (compare-by :distance asc :halite desc)
+                                          (map #(assoc % :distance (distance-between width height ship %))
+                                               top-cells)))]
+          closest-target)))))
 
 (defn get-uninspired-cell-target
   "Returns the target to move after."
@@ -322,7 +346,7 @@
                   {:ship (assoc ship :target target)
                    :target target
                    :direction best-direction
-                   :reason (str "There were no good targets so I picked" (dissoc target :neighbors))})))))))))
+                   :reason (str "There were no good targets so I picked" (select-keys target [:x :y]))})))))))))
 
 (defn get-dropoff-move
   "Returns a move towards a dropoff site."
@@ -448,6 +472,9 @@
                   move (assoc move :location location :collision colliding-ship
                                    :pre-collision prior-colliding-ship)
                   updated-cells (add-ship-to-cell (:cells world) ship location)
+                  updated-cells (if target
+                                  (inc-ship-count-for-cell updated-cells (get-location world target STILL))
+                                  updated-cells)
                   ; updated-cells (add-ship-to-cell (:cells world)
                   ;                                 (merge ship (select-keys location [:x :y]))
                   ;                                 location)
@@ -472,31 +499,41 @@
 (defn score-cell
   "Sets a score for a cell."
   [world cell]
-  ; (log "Scoring cell:" cell)
-  (let [surrounding-cells (get-cells-within-two-range world cell)]
-    [(+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
-        (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
-     ; (+ (* 4 (+ (get-bonus cell) (:halite cell))
-     ;     (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells))))]))
-     (+ (* 1.25 (:halite cell))
-        (reduce + (map :halite surrounding-cells)))]))
+  (let [surrounding-cells (get-cells-within-two-range world cell)
+        score (+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
+                 (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
+        uninspired-score (+ (* 1.25 (:halite cell))
+                            (reduce + (map :halite surrounding-cells)))
+        gather-locations (concat [(select-keys cell [:x :y])]
+                                 (get-in cell [:neighbors 1])
+                                 (get-in cell [:neighbors 2])
+                                 (get-in cell [:neighbors 3])
+                                 (get-in cell [:neighbors 4])
+                                 (get-in cell [:neighbors 5]))
+                                 ; (get-in cell [:neighbors 6]))
+        gather-cells (map #(get-location world % STILL) gather-locations)
+        total-nearby-halite (reduce + (map :halite gather-cells))
+        total-nearby-bonus (reduce + (map get-bonus gather-cells))
+        nearby-ship-count (count (keep #(get-in world [:ship-location-map %]) gather-locations))
+        surrounded-enemy-count (get-surrounded-enemy-count world cell)]
+    {:score score
+     :uninspired-score uninspired-score
+     :nearby-halite total-nearby-halite
+     :nearby-gather (+ total-nearby-halite total-nearby-bonus)
+     :nearby-ship-count nearby-ship-count
+     :surrounded-enemy-count surrounded-enemy-count}))
 
 (defn decorate-cells
-  "Adds dropoff distance and a score to each cell. Handles multiple shipyards and choose the min distance."
+  "Adds dropoff distance and a score to each cell. Handles multiple shipyards and chooses the min
+  distance."
   [world cells-to-update shipyards]
   (let [dropoffs shipyards
         {:keys [width height]} world]
     (into {}
       (for [cell cells-to-update
             :let [min-distance (first (sort (map #(distance-between width height cell %) dropoffs)))
-                  [score uninspired-score] (score-cell world cell)
-                  enemy-side-count (get-surrounded-enemy-count world cell)]]
-                  ; uninspired-score (- uninspired-score (* 100 min-distance))]]
-        [(select-keys cell [:x :y]) (assoc cell
-                                           :dropoff-distance min-distance
-                                           :score score
-                                           :uninspired-score uninspired-score
-                                           :surrounded-enemy-count enemy-side-count)]))))
+                  cell-extras (score-cell world cell)]]
+        [(select-keys cell [:x :y]) (merge cell cell-extras {:dropoff-distance min-distance})]))))
 
 (defn decorate-ship
   "Adds extra keys to a ship that are useful."
@@ -563,21 +600,20 @@
   (let [{:keys [cells width height ship-location-map]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
+        cells (map #(assoc % :per-ship-gather (/ (:nearby-gather %)
+                                                 (inc (:nearby-ship-count %))))
+                   cells)
+        min-scoring-target (:per-ship-gather (first (take num-cells-to-return
+                                                          (sort (compare-by :per-ship-gather asc)
+                                                                cells))))
         cells (remove #(get ship-location-map (select-keys % [:x :y]))
-                            ; (< (:halite %) 1000))
                       cells)
-        ; best-cells (take num-cells-to-return (sort (compare-by :score desc) cells))
         best-cells (if (two-player? world)
                      cells
-                     (filter #(safe-location? world {:halite 1000} %) cells))
-        ; cells (filter #(safe-location? world {assoc % :halite 1000} %)
-        ;               cells)]
-
-        ; cells (filter #(> (:halite %) 150)
-        ;               (vals cells))
-        best-cells cells]
-    [(take num-cells-to-return (sort (compare-by :score desc) best-cells))
-     (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))]))
+                     (filter #(safe-location? world {:halite 1000} %) cells))]
+    {:top-cells (take num-cells-to-return (sort (compare-by :score desc) best-cells))
+     :uninspired-cells (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))
+     :min-scoring-target min-scoring-target}))
 
 (defn remove-bad-targets
   "If my current cell is better than my target - get rid of my target."
@@ -594,7 +630,7 @@
                                                target-location (select-keys (:target ship) [:x :y])]
                                            (or (= target-location ship-location)
                                                (get ship-location-map target-location)
-                                               (<= (distance-between width height ship-location target-location) 15)
+                                               (<= (distance-between width height ship-location target-location) 3)
                                                (better-cell? (get-location world ship STILL)
                                                              (get-location world (:target ship) STILL))
                                                (some (set [(select-keys ship [:x :y])])
@@ -804,7 +840,7 @@
             _ (doseq [cell (filter :inspired (vals cells))]
                 (flog world (select-keys cell [:x :y]) "Inspired")) ;:yellow))
             world (assoc world :cells cells)
-            [top-cells uninspired-cells] (get-top-cells world PERCENT_TOP_CELLS)
+            {:keys [top-cells uninspired-cells min-scoring-target]} (get-top-cells world PERCENT_TOP_CELLS)
             min-top-cell-score (if (empty? top-cells)
                                  0
                                  (->> top-cells
@@ -830,6 +866,7 @@
                          :my-player my-player
                          :top-cells top-cells
                          :uninspired-cells uninspired-cells
+                         :min-scoring-target min-scoring-target
                          :min-top-cell-score min-top-cell-score
                          :min-uninspired-score min-uninspired-score)
             build-dropoff-distance (get-dropoff-distance (count (:dropoffs my-player)))
