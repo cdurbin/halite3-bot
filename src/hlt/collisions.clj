@@ -23,8 +23,8 @@
   (let [current-cell (get-location world ship STILL)]
     (+
        ; (:halite ship)
-       (* MOVE_COST (:halite current-cell))
-       (* GATHER_AMOUNT (+ (:halite current-cell) (get-bonus current-cell)))
+       (* MOVE_COST (get current-cell :halite 0))
+       (* GATHER_AMOUNT (+ (get current-cell :halite 0) (get-bonus current-cell)))
        (if (two-player? world)
          (get-inspire-delta-by-move world ship cell)
          (if (or (little-halite-left? world MIN_CRASH_FOR_HALITE)
