@@ -263,17 +263,19 @@
   "Returns a value of the net halite change from a collision. This could get complicated to
   track correctly, but is probably one of the most important things to get right in this game."
   [world my-ship cell their-ship]
-  (let [{:keys [total leftover]} (play-out-fight world cell my-ship their-ship)]
-    ; (flog world cell (str "SOW: total" total "leftover" leftover))
-    (if (<= 0 leftover)
-      total
-      (let [my-closest-base (get-closest-cell world cell (-> world :my-player :dropoffs))
-            their-closest-base (get-closest-cell world cell (:enemy-dropoffs world))]
-        (if (< (:distance my-closest-base) (:distance their-closest-base))
-          (+ total (* 0.5 leftover))
-          (if (= (:distance my-closest-base) (:distance their-closest-base))
-            total
-            (- total (* 0.5 leftover))))))))
+  (if (= 0 (:dropoff-distance cell))
+    (:halite their-ship)
+    (let [{:keys [total leftover]} (play-out-fight world cell my-ship their-ship)]
+      ; (flog world cell (str "SOW: total" total "leftover" leftover))
+      (if (<= 0 leftover)
+        total
+        (let [my-closest-base (get-closest-cell world cell (-> world :my-player :dropoffs))
+              their-closest-base (get-closest-cell world cell (:enemy-dropoffs world))]
+          (if (< (:distance my-closest-base) (:distance their-closest-base))
+            (+ total (* 0.5 leftover))
+            (if (= (:distance my-closest-base) (:distance their-closest-base))
+              total
+              (- total (* 0.5 leftover)))))))))
 
 (defn score-collision
   "Provides a score for choosing the given cell with regards to collision. Positive means
@@ -295,7 +297,7 @@
 (defn ram-danger-new?
   ""
   [world ship cell]
-  (when ship
+  (when (and ship (not= 0 (:dropoff-distance cell)))
     (let [enemy-ships (filter #(and (not= (:my-id world) (:owner %))
                                     (not (ghost-ship? %)))
                               (get-ships-in-cells world (get-in cell [:neighbors 1])))
@@ -336,8 +338,8 @@
    4 {32 ram-danger-new?
       40 ram-danger-new?
       48 ram-danger-new?
-      56 ram-danger-old?
-      64 ram-danger-old?}})
+      56 ram-danger-new?
+      64 ram-danger-new?}})
 
 (def should-ram-function
   "Maps players and map size to the version of the ram function to use."
