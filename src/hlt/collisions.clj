@@ -305,7 +305,7 @@
           low-score (if (or (nil? low-score)
                             (two-player? world))
                       low-score
-                      (+ low-score (* 0.25 (get-value-of-a-ship world))))]
+                      (- low-score (* 0.25 (get-value-of-a-ship world))))]
 
       ; (flog world cell "RD: enemy-ships" enemy-ships)
       (when (seq scores)

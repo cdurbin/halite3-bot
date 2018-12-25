@@ -152,7 +152,7 @@
                       (let [ratio (/ (:nearby-gather cell)
                                      (inc (:nearby-ship-count cell)))]
                         (when (and (>= ratio min-scoring-target)
-                                   (<= (distance-between width height ship cell) 20))
+                                   (<= (distance-between width height ship cell) 30))
                           (assoc cell :ratio ratio))))
                             ; (>= (get-gather-amount %)
                             ;     50))
@@ -340,11 +340,12 @@
                   (log "Nearby Target is " (dissoc target :neighbors) "and best direction" best-direction)
                   {:ship ship
                    :direction best-direction
-                   :reason (str "Moving to best target in my nearby cells" (dissoc target :neighbors))})
+                   :reason (str "Moving to best target in my nearby cells"
+                                (select-keys target [:x :y :halite-carried :nearby-ship-count]))})
                 ;; Need to choose a new target
                 (let [target (get-top-cell-target world ship)
-                      ; best-direction (get-best-gather-direction world ship target safe-cells)
-                      best-direction (get-best-direction world ship target safe-cells)
+                      best-direction (get-best-gather-direction world ship target safe-cells)
+                      ; best-direction (get-best-direction world ship target safe-cells)
                       best-direction (or best-direction STILL)]
                   (log "Target is " target "and best direction" best-direction)
                   (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
@@ -647,7 +648,7 @@
                                                target-location (select-keys (:target ship) [:x :y])]
                                            (or (= target-location ship-location)
                                                (get ship-location-map target-location)
-                                               (<= (distance-between width height ship-location target-location) 3)
+                                               (<= (distance-between width height ship-location target-location) 15)
                                                (better-cell? (get-location world ship STILL)
                                                              (get-location world (:target ship) STILL))
                                                (some (set [(select-keys ship [:x :y])])
