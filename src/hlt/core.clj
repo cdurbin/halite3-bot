@@ -158,9 +158,11 @@
                             ;     50))
 
                                 ; (apply max 50 (map get-gather-amount (get-surrounding-cells world %)))))
-                    (vals cells))]
+                    (vals cells))
+        cells (take 10 (sort (compare-by :ratio desc) cells))]
     (if (seq cells)
-      (let [best-target (first (sort (compare-by :ratio asc :nearby-ship-count asc) cells))]
+      ; (let [best-target (first (sort (compare-by :ratio desc :nearby-ship-count asc) cells))])
+      (let [best-target (first (sort (compare-by :distance asc :ratio desc :nearby-ship-count asc) cells))]
         best-target
         (let [closest-target (first (sort (compare-by :distance asc :halite desc)
                                           (map #(assoc % :distance (distance-between width height ship %))
@@ -331,7 +333,9 @@
                :direction STILL
                :reason "collect more from current cell than last turn gain of target."}
               (if target
-                (let [best-direction (get-best-gather-direction world ship target safe-cells)
+                (let [
+                      ; best-direction (get-best-gather-direction world ship target safe-cells)
+                      best-direction (get-best-direction world ship target safe-cells)
                       best-direction (or best-direction STILL)]
                   (log "Nearby Target is " (dissoc target :neighbors) "and best direction" best-direction)
                   {:ship ship
@@ -339,12 +343,14 @@
                    :reason (str "Moving to best target in my nearby cells" (dissoc target :neighbors))})
                 ;; Need to choose a new target
                 (let [target (get-top-cell-target world ship)
-                      best-direction (get-best-gather-direction world ship target safe-cells)
+                      ; best-direction (get-best-gather-direction world ship target safe-cells)
+                      best-direction (get-best-direction world ship target safe-cells)
                       best-direction (or best-direction STILL)]
                   (log "Target is " target "and best direction" best-direction)
                   (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
                   {:ship (assoc ship :target target)
                    :target target
+                   :new-target true
                    :direction best-direction
                    :reason (str "There were no good targets so I picked" (select-keys target [:x :y]))})))))))))
 
@@ -472,7 +478,7 @@
                   move (assoc move :location location :collision colliding-ship
                                    :pre-collision prior-colliding-ship)
                   updated-cells (add-ship-to-cell (:cells world) ship location)
-                  updated-cells (if target
+                  updated-cells (if (:new-target move)
                                   (inc-ship-count-for-cell updated-cells (get-location world target STILL))
                                   updated-cells)
                   ; updated-cells (add-ship-to-cell (:cells world)
@@ -496,25 +502,36 @@
           {:world world}
           ships))
 
+; (defn target-count-by-cell
+;   "Returns a map of target count by cell."
+;   [world ships]
+;   (let [targets (keep :target ships)]
+;     (group-by #(select-keys % [:x :y]) targets)))
+
 (defn score-cell
   "Sets a score for a cell."
   [world cell]
-  (let [surrounding-cells (get-cells-within-two-range world cell)
+  (let [two-range-locations (concat (get-in cell [:neighbors 1])
+                                    (get-in cell [:neighbors 2]))
+        surrounding-cells (map #(get-location world % STILL) two-range-locations)
         score (+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
                  (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
         uninspired-score (+ (* 1.25 (:halite cell))
                             (reduce + (map :halite surrounding-cells)))
         gather-locations (concat [(select-keys cell [:x :y])]
-                                 (get-in cell [:neighbors 1])
-                                 (get-in cell [:neighbors 2])
+                                 ; (get-in cell [:neighbors 1])
+                                 ; (get-in cell [:neighbors 2])
                                  (get-in cell [:neighbors 3])
-                                 (get-in cell [:neighbors 4])
-                                 (get-in cell [:neighbors 5]))
+                                 (get-in cell [:neighbors 4]))
+                                 ; (get-in cell [:neighbors 5]))
                                  ; (get-in cell [:neighbors 6]))
         gather-cells (map #(get-location world % STILL) gather-locations)
+        gather-cells (concat surrounding-cells gather-cells)
         total-nearby-halite (reduce + (map :halite gather-cells))
         total-nearby-bonus (reduce + (map get-bonus gather-cells))
         nearby-ship-count (count (keep #(get-in world [:ship-location-map %]) gather-locations))
+        target-count (count (get-in world [:targets (select-keys cell [:x :y])]))
+        nearby-ship-count (+ nearby-ship-count target-count)
         surrounded-enemy-count (get-surrounded-enemy-count world cell)]
     {:score score
      :uninspired-score uninspired-score
@@ -888,6 +905,12 @@
                     world)
             world (assoc world :dropoff-locations dropoff-locations)
             world (remove-bad-targets world last-dropoff-location)
+            targets (keep :target (-> world :my-player :ships))
+            updated-cells (reduce (fn [upd-cells next-target]
+                                    (inc-ship-count-for-cell upd-cells (get-location world next-target STILL)))
+                                  (:cells world)
+                                  targets)
+            world (assoc world :cells updated-cells)
             my-player (:my-player world)
             build-dropoff? (should-build-dropoff? world)
             halite-to-save (if build-dropoff?
