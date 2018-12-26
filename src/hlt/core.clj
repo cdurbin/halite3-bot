@@ -151,26 +151,36 @@
         cells (keep (fn [cell]
                       (let [ratio (/ (:nearby-gather cell)
                                      (inc (:nearby-ship-count cell)))]
-                        (when (and (>= ratio min-scoring-target)
-                                   (<= (distance-between width height ship cell) 30))
+                        (when (and (>= ratio min-scoring-target))
+                          (let [dist (distance-between width height ship cell)]
+                            (when (> dist 4)
+
+                                   ; (<= (distance-between width height ship cell) 30))
                                    ; (or (two-player? world)
                                        ; (safe-location-old? world {:halite 1000} cell)))
                                        ; (safe-location? world ship cell)))
-                          (assoc cell :ratio ratio))))
+                              (assoc cell
+                                     :ratio (int (/ ratio (inc dist)))))))))
+                    ; (assoc cell
+                          ;        :ratio (let [dist (inc (:dropoff-distance cell))]
+                          ;                 (/ ratio dist))))))
+
                             ; (>= (get-gather-amount %)
                             ;     50))
 
                                 ; (apply max 50 (map get-gather-amount (get-surrounding-cells world %)))))
-                    target-cells)
-        cells (take 10 (sort (compare-by :ratio desc) cells))]
+                    target-cells)]
+        ; cells (take 10 (sort (compare-by :ratio desc) cells))]
     (if (seq cells)
       ; (let [best-target (first (sort (compare-by :ratio desc :nearby-ship-count asc) cells))])
-      (let [best-target (first (sort (compare-by :distance asc :ratio desc :nearby-ship-count asc) cells))]
-        best-target
-        (let [closest-target (first (sort (compare-by :distance asc :halite desc)
-                                          (map #(assoc % :distance (distance-between width height ship %))
-                                               top-cells)))]
-          closest-target)))))
+      ; (if-let [best-target (first (sort (compare-by :distance asc :ratio desc :nearby-ship-count asc) cells))])
+      (if-let [best-target (first (sort (compare-by :ratio desc :nearby-ship-count asc) cells))]
+        (do (log "Turn" (:turn world) "Found a best target by ratio" (select-keys best-target [:x :y :halite :ratio]))
+            best-target))
+      (let [closest-target (first (sort (compare-by :distance asc :halite desc)
+                                        (map #(assoc % :distance (distance-between width height ship %))
+                                             top-cells)))]
+        closest-target))))
 
 (defn get-uninspired-cell-target
   "Returns the target to move after."
@@ -325,8 +335,24 @@
                                 (<= mined-this-turn 25)
                                 (<= (+ (:halite target) (get-bonus target)) 100)
                                 ; (<= (:last-turn-gain target) 10)
+                                ; (or (= 0 (:min-scoring-target world))
+                                ;     (not (little-halite-left? world 350))
+                                ;     (< (get-gather-amount target) (* GATHER_AMOUNT 0.25 (:min-scoring-target world))))
                                 (< (+ (:score target) TOP_SCORE_DELTA)
                                    (:min-top-cell-score world)))
+                ; target (if (and target
+                ;                 (or (< (get-gather-amount target) 10)
+                ;                     (and (>= (:turns target) MAX_TURNS_EVALUATE)
+                ;                          (seq (:top-cells world))
+                ;                          ; (> mined-this-turn (:last-turn-gain target))
+                ;                          (<= mined-this-turn 25)
+                ;                          (<= (+ (:halite target) (get-bonus target)) 100)
+                ;                          ; (<= (:last-turn-gain target) 10)
+                ;                          (or (= 0 (:min-scoring-target world))
+                ;                              (not (little-halite-left? world 350))
+                ;                              (< (get-gather-amount target) (* GATHER_AMOUNT 0.25 (:min-scoring-target world))))
+                ;                          (< (+ (:score target) TOP_SCORE_DELTA)
+                ;                             (:min-top-cell-score world)))))
                          nil
                          target)]
             (if (and target
@@ -356,7 +382,7 @@
                    :target target
                    :new-target true
                    :direction best-direction
-                   :reason (str "There were no good targets so I picked" (select-keys target [:x :y]))})))))))))
+                   :reason (str "There were no good targets so I picked" (select-keys target [:x :y :ratio]))})))))))))
 
 (defn get-dropoff-move
   "Returns a move towards a dropoff site."
@@ -541,7 +567,7 @@
         total-nearby-halite (reduce + (map :halite gather-cells))
         total-nearby-bonus (reduce + (map get-bonus gather-cells))
         nearby-ships (keep #(get-in world [:ship-location-map %]) gather-locations)
-        nearby-ship-count (reduce + (map #(if (= my-id (:owner %)) 1 0.5)
+        nearby-ship-count (reduce + (map #(if (= my-id (:owner %)) 1 0.75)
                                          nearby-ships))
         target-count (count (get-in world [:targets (select-keys cell [:x :y])]))
         nearby-ship-count (+ nearby-ship-count target-count)
@@ -627,29 +653,30 @@
 (defn get-top-cells
   "Returns the top pct cells by score"
   [world pct]
-  (let [{:keys [cells width height ship-location-map]} world
+  (let [{:keys [cells width height ship-location-map my-ship-count]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
-        cells (map #(assoc % :per-ship-gather (/ (:nearby-gather %)
-                                                 (inc (:nearby-ship-count %))))
-                   cells)
-        min-scoring-target (:per-ship-gather (first (take num-cells-to-return
-                                                          (sort (compare-by :per-ship-gather asc)
-                                                                cells))))
         cells (remove #(get ship-location-map (select-keys % [:x :y]))
                       cells)
         best-cells (if (two-player? world)
                      cells
                      (filter #(safe-location? world {:halite 1000} %) cells))
-        target-cells (take (* 3 num-cells-to-return) (sort (compare-by :halite desc) cells))
-        target-cells (if (two-player? world)
-                       target-cells
-                       (filter #(safe-location? world {:halite 1000} %) target-cells))]
+        cells (when (> my-ship-count 5)
+                (map #(assoc % :per-ship-gather (/ (:nearby-gather %)
+                                                   (inc (:nearby-ship-count %))))
+                     best-cells))
+        ; min-scoring-target (min 750)
+        min-scoring-target (:per-ship-gather (first (take num-cells-to-return
+                                                          (sort (compare-by :per-ship-gather asc)
+                                                                cells))))
+        target-cells (take (* 3 num-cells-to-return) (sort (compare-by :halite desc) cells))]
 
     {:top-cells (take num-cells-to-return (sort (compare-by :score desc) best-cells))
      :uninspired-cells (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))
      :target-cells target-cells
-     :min-scoring-target min-scoring-target}))
+     :min-scoring-target (if min-scoring-target
+                           (min 1500 min-scoring-target)
+                           0)}))
 
 (defn remove-bad-targets
   "If my current cell is better than my target - get rid of my target."
@@ -955,8 +982,8 @@
                                          dropoff-location)
             other-ships (get-my-ships-that-can-move stuck-ships my-player)
             other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
-            ; collecting-ships (sort (compare-by :halite desc))
-            collecting-ships (sort (compare-by :dropoff-distance desc :halite desc)
+            collecting-ships (sort (compare-by :halite desc)
+            ; collecting-ships (sort (compare-by :dropoff-distance desc :halite desc)
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))

@@ -4,6 +4,10 @@ Starter bot for Halite 3 written in Clojure
 
 ## TODO
 
+### 12/25
+
+* Don't use safe-location-old - needs to use the same logic
+
 ### 12/10
 
 * [ ] Fix end game return (leaving too many turtles behind)
