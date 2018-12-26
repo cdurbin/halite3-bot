@@ -147,21 +147,21 @@
   "Returns the target to move after."
   [world ship]
   ; (println "Choosing target - min-scoring-target is:" (:min-scoring-target world))
-  (let [{:keys [width height min-scoring-target cells top-cells]} world
+  (let [{:keys [width height min-scoring-target cells target-cells top-cells]} world
         cells (keep (fn [cell]
                       (let [ratio (/ (:nearby-gather cell)
                                      (inc (:nearby-ship-count cell)))]
                         (when (and (>= ratio min-scoring-target)
-                                   (<= (distance-between width height ship cell) 30)
-                                   (or (two-player? world)
-                                       (safe-location-old? world {:halite 1000} cell)))
+                                   (<= (distance-between width height ship cell) 30))
+                                   ; (or (two-player? world)
+                                       ; (safe-location-old? world {:halite 1000} cell)))
                                        ; (safe-location? world ship cell)))
                           (assoc cell :ratio ratio))))
                             ; (>= (get-gather-amount %)
                             ;     50))
 
                                 ; (apply max 50 (map get-gather-amount (get-surrounding-cells world %)))))
-                    (vals cells))
+                    target-cells)
         cells (take 10 (sort (compare-by :ratio desc) cells))]
     (if (seq cells)
       ; (let [best-target (first (sort (compare-by :ratio desc :nearby-ship-count asc) cells))])
@@ -640,9 +640,15 @@
                       cells)
         best-cells (if (two-player? world)
                      cells
-                     (filter #(safe-location? world {:halite 1000} %) cells))]
+                     (filter #(safe-location? world {:halite 1000} %) cells))
+        target-cells (take (* 3 num-cells-to-return) (sort (compare-by :halite desc) cells))
+        target-cells (if (two-player? world)
+                       target-cells
+                       (filter #(safe-location? world {:halite 1000} %) target-cells))]
+
     {:top-cells (take num-cells-to-return (sort (compare-by :score desc) best-cells))
      :uninspired-cells (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))
+     :target-cells target-cells
      :min-scoring-target min-scoring-target}))
 
 (defn remove-bad-targets
@@ -870,7 +876,7 @@
             _ (doseq [cell (filter :inspired (vals cells))]
                 (flog world (select-keys cell [:x :y]) "Inspired")) ;:yellow))
             world (assoc world :cells cells)
-            {:keys [top-cells uninspired-cells min-scoring-target]} (get-top-cells world PERCENT_TOP_CELLS)
+            {:keys [top-cells uninspired-cells min-scoring-target target-cells]} (get-top-cells world PERCENT_TOP_CELLS)
             min-top-cell-score (if (empty? top-cells)
                                  0
                                  (->> top-cells
@@ -895,6 +901,7 @@
             world (assoc world
                          :my-player my-player
                          :top-cells top-cells
+                         :target-cells target-cells
                          :uninspired-cells uninspired-cells
                          :min-scoring-target min-scoring-target
                          :min-top-cell-score min-top-cell-score
