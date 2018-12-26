@@ -240,19 +240,19 @@
               total-halite (if (> delta 0)
                              (long (+ total-halite gathered-one-round))
                              (long (- total-halite gathered-one-round)))]
-          (log (format (str "Turn: %d, iteration %d, cell %s, ships: %s, my-carry-capacity: %d, "
-                            "other-carry-capacity: %d, delta %d, delta-carry %d, gathered-one-round %d, "
-                            "total-halite (aka score): %d")
-                       (:turn world)
-                       iteration
-                       (select-keys cell [:x :y])
-                       (pr-str ships)
-                       my-carry-capacity
-                       other-carry-capacity
-                       (long delta)
-                       (long delta-carry)
-                       (long gathered-one-round)
-                       (long total-halite)))
+          ; (log (format (str "Turn: %d, iteration %d, cell %s, ships: %s, my-carry-capacity: %d, "
+          ;                   "other-carry-capacity: %d, delta %d, delta-carry %d, gathered-one-round %d, "
+          ;                   "total-halite (aka score): %d")
+          ;              (:turn world)
+          ;              iteration
+          ;              (select-keys cell [:x :y])
+          ;              (pr-str ships)
+          ;              my-carry-capacity
+          ;              other-carry-capacity
+          ;              (long delta)
+          ;              (long delta-carry)
+          ;              (long gathered-one-round)
+          ;              (long total-halite)))
           (recur remaining-halite
                  (inc iteration)
                  total-halite
@@ -305,8 +305,9 @@
           low-score (if (or (nil? low-score)
                             (two-player? world))
                       low-score
-                      low-score)]
-                      ; (- low-score (* 0.25 (get-value-of-a-ship world))))]
+                      (if (= (select-keys ship [:x :y]) (select-keys cell [:x :y]))
+                        (+ low-score (* 0.25 (get-value-of-a-ship world)))
+                        low-score))]
 
       ; (flog world cell "RD: enemy-ships" enemy-ships)
       (when (seq scores)
