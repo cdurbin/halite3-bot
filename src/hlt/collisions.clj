@@ -295,7 +295,7 @@
 (defn ram-danger-new?
   ""
   [world ship cell]
-  (when ship
+  (when (and ship (not= 0 (:dropoff-distance cell)))
     (let [enemy-ships (filter #(and (not= (:my-id world) (:owner %))
                                     (not (ghost-ship? %)))
                               (get-ships-in-cells world (get-in cell [:neighbors 1])))
@@ -305,7 +305,8 @@
           low-score (if (or (nil? low-score)
                             (two-player? world))
                       low-score
-                      (+ low-score (* 0.25 (get-value-of-a-ship world))))]
+                      low-score)]
+                      ; (- low-score (* 0.25 (get-value-of-a-ship world))))]
 
       ; (flog world cell "RD: enemy-ships" enemy-ships)
       (when (seq scores)
@@ -319,12 +320,16 @@
   (when ship
     (when-let [other-ship (:ship cell)]
       (let [score (int (score-collision world ship other-ship cell))
-            score (if (two-player? world)
+            score (if (or (two-player? world)
+                          (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                          (< (:turns-left world) CRASH_TURNS_LEFT))
                     score
                     (- score (get-value-of-a-ship world)))]
         (when (> score 0)
           (flog-color world cell (str "Score:" score) :green))
-        (> score 20)))))
+        (if (two-player? world)
+          (> score 0)
+          (> score 100))))))
 
 (def ram-danger-function
   "Maps players and map size to the version of the ram function to use."
