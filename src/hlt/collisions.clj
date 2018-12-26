@@ -240,19 +240,19 @@
               total-halite (if (> delta 0)
                              (long (+ total-halite gathered-one-round))
                              (long (- total-halite gathered-one-round)))]
-          (log (format (str "Turn: %d, iteration %d, cell %s, ships: %s, my-carry-capacity: %d, "
-                            "other-carry-capacity: %d, delta %d, delta-carry %d, gathered-one-round %d, "
-                            "total-halite (aka score): %d")
-                       (:turn world)
-                       iteration
-                       (select-keys cell [:x :y])
-                       (pr-str ships)
-                       my-carry-capacity
-                       other-carry-capacity
-                       (long delta)
-                       (long delta-carry)
-                       (long gathered-one-round)
-                       (long total-halite)))
+          ; (log (format (str "Turn: %d, iteration %d, cell %s, ships: %s, my-carry-capacity: %d, "
+          ;                   "other-carry-capacity: %d, delta %d, delta-carry %d, gathered-one-round %d, "
+          ;                   "total-halite (aka score): %d")
+          ;              (:turn world)
+          ;              iteration
+          ;              (select-keys cell [:x :y])
+          ;              (pr-str ships)
+          ;              my-carry-capacity
+          ;              other-carry-capacity
+          ;              (long delta)
+          ;              (long delta-carry)
+          ;              (long gathered-one-round)
+          ;              (long total-halite)))
           (recur remaining-halite
                  (inc iteration)
                  total-halite
@@ -377,6 +377,19 @@
                        (or (and (nil? other-ship)
                                 (<= (:dropoff-distance cell) (:turns-left world)))
                            (should-ram? world ship cell))))]
+    safe?))
+
+(defn safe-location-old?
+  "Returns true if I can move to the location without crashing."
+  [world ship location]
+  (let [cell (get (:cells world) (select-keys location [:x :y]))
+        other-ship (:ship cell)
+        safe? (or (and (<= (:turns-left world) TURNS_TO_START_CRASHING)
+                       (= 0 (:dropoff-distance cell)))
+                  (and (not (ram-danger-old? world ship cell))
+                       (or (and (nil? other-ship)
+                                (<= (:dropoff-distance cell) (:turns-left world)))
+                           (should-ram-old? world ship cell))))]
     safe?))
 
 (defn safe-ignoring-ghost-ships?
