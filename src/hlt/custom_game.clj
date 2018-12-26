@@ -329,13 +329,19 @@
 
 (defn inc-ship-count-for-cell
   "Adds a ship to a given cell."
-  [cells cell]
-  (let [locations (concat [(select-keys cell [:x :y])]
-                          (get-in cell [:neighbors 1])
-                          (get-in cell [:neighbors 2])
-                          (get-in cell [:neighbors 3])
-                          (get-in cell [:neighbors 4])
-                          (get-in cell [:neighbors 5]))]
+  [world cells cell]
+  (let [locations (if (and (:total-ship-count world)
+                           (= 64 (:width world))
+                           (not (two-player? world)))
+                    (concat [(select-keys cell [:x :y])]
+                            (get-in cell [:neighbors 1])
+                            (get-in cell [:neighbors 2]))
+                    (concat [(select-keys cell [:x :y])]
+                            (get-in cell [:neighbors 1])
+                            (get-in cell [:neighbors 2])
+                            (get-in cell [:neighbors 3])
+                            (get-in cell [:neighbors 4])))]
+                            ; (get-in cell [:neighbors 5])))]
     (reduce (fn [old-cells next-loc]
               (update-in old-cells [next-loc :nearby-ship-count] inc))
             cells

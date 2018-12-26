@@ -307,14 +307,14 @@
           low-score (if (or (nil? low-score)
                             (two-player? world))
                       low-score
-                      (- low-score (* 0.25 (get-value-of-a-ship world))))]
+                      (- low-score (* 0.50 (get-value-of-a-ship world))))]
 
       ; (flog world cell "RD: enemy-ships" enemy-ships)
       (when (seq scores)
         (if (< low-score 0)
           (flog-color world cell (str "Scores:" (pr-str scores)) :brown)
           (flog-color world cell (str "Scores:" (pr-str scores)) :yellow))
-        (< low-score 0)))))
+        (< low-score 100)))))
 
 (defn should-ram-new?
   [world ship cell]

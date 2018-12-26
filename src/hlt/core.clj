@@ -152,7 +152,9 @@
                       (let [ratio (/ (:nearby-gather cell)
                                      (inc (:nearby-ship-count cell)))]
                         (when (and (>= ratio min-scoring-target)
-                                   (<= (distance-between width height ship cell) 30))
+                                   (<= (distance-between width height ship cell) 30)
+                                   (or (two-player? world)
+                                       (safe-location? world ship cell)))
                           (assoc cell :ratio ratio))))
                             ; (>= (get-gather-amount %)
                             ;     50))
@@ -480,7 +482,7 @@
                                    :pre-collision prior-colliding-ship)
                   updated-cells (add-ship-to-cell (:cells world) ship location)
                   updated-cells (if (:new-target move)
-                                  (inc-ship-count-for-cell updated-cells (get-location world target STILL))
+                                  (inc-ship-count-for-cell world updated-cells (get-location world target STILL))
                                   updated-cells)
                   ; updated-cells (add-ship-to-cell (:cells world)
                   ;                                 (merge ship (select-keys location [:x :y]))
@@ -512,25 +514,34 @@
 (defn score-cell
   "Sets a score for a cell."
   [world cell]
-  (let [two-range-locations (concat (get-in cell [:neighbors 1])
+  (let [{:keys [total-ship-count my-id width]} world
+        two-range-locations (concat (get-in cell [:neighbors 1])
                                     (get-in cell [:neighbors 2]))
         surrounding-cells (map #(get-location world % STILL) two-range-locations)
         score (+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
                  (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
         uninspired-score (+ (* 1.25 (:halite cell))
                             (reduce + (map :halite surrounding-cells)))
-        gather-locations (concat [(select-keys cell [:x :y])]
-                                 ; (get-in cell [:neighbors 1])
-                                 ; (get-in cell [:neighbors 2])
-                                 (get-in cell [:neighbors 3])
-                                 (get-in cell [:neighbors 4]))
+        gather-locations (if (and (> total-ship-count 150)
+                                  (= width 64)
+                                  (not (two-player? world)))
+                           [(select-keys cell [:x :y])]
+                           (concat [(select-keys cell [:x :y])]
+                                   (get-in cell [:neighbors 3])
+                                   (get-in cell [:neighbors 4])))
+
+        ; gather-locations (concat [(select-keys cell [:x :y])]
+        ;                          (get-in cell [:neighbors 3])
+        ;                          (get-in cell [:neighbors 4]))
                                  ; (get-in cell [:neighbors 5]))
                                  ; (get-in cell [:neighbors 6]))
         gather-cells (map #(get-location world % STILL) gather-locations)
         gather-cells (concat surrounding-cells gather-cells)
         total-nearby-halite (reduce + (map :halite gather-cells))
         total-nearby-bonus (reduce + (map get-bonus gather-cells))
-        nearby-ship-count (count (keep #(get-in world [:ship-location-map %]) gather-locations))
+        nearby-ships (keep #(get-in world [:ship-location-map %]) gather-locations)
+        nearby-ship-count (reduce + (map #(if (= my-id (:owner %)) 1 0.5)
+                                         nearby-ships))
         target-count (count (get-in world [:targets (select-keys cell [:x :y])]))
         nearby-ship-count (+ nearby-ship-count target-count)
         surrounded-enemy-count (get-surrounded-enemy-count world cell)]
@@ -822,7 +833,7 @@
   (let [world (load-world)
         {:keys [my-shipyard cells width height num-players my-id other-shipyards]} world
         cells (map #(add-neighbors world %) (vals cells))
-        cells (decorate-cells world cells [my-shipyard])
+        cells (decorate-cells (assoc world :total-ship-count 0) cells [my-shipyard])
         last-turn (total-turns height width)
         last-spawn-turn (* last-turn (get last-spawn-turn-pct num-players))
         last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
@@ -908,7 +919,7 @@
             world (remove-bad-targets world last-dropoff-location)
             targets (keep :target (-> world :my-player :ships))
             updated-cells (reduce (fn [upd-cells next-target]
-                                    (inc-ship-count-for-cell upd-cells (get-location world next-target STILL)))
+                                    (inc-ship-count-for-cell world upd-cells (get-location world next-target STILL)))
                                   (:cells world)
                                   targets)
             world (assoc world :cells updated-cells)
@@ -936,7 +947,8 @@
                                          dropoff-location)
             other-ships (get-my-ships-that-can-move stuck-ships my-player)
             other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
-            collecting-ships (sort (compare-by :halite desc)
+            ; collecting-ships (sort (compare-by :halite desc))
+            collecting-ships (sort (compare-by :dropoff-distance desc :halite desc)
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))
