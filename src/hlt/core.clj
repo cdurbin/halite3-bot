@@ -23,6 +23,7 @@
 (def BACK_TO_GATHER_AMOUNT 650)
 (def MIN_DROPOFF_DISTANCE 4)
 (def PERCENT_TOP_CELLS 12)
+; (def PERCENT_TOP_CELLS 20)
 (def TOP_SCORE_DELTA 200)
 ; (def TURNS_TO_START_CRASHING 8)
 
@@ -30,7 +31,7 @@
   {2 0.52
    4 0.70})
 
-(def LAST_TURN_DROPOFF_PCT 0.85)
+(def LAST_TURN_DROPOFF_PCT 0.80)
 (def MIN_SHIPS_BEFORE_IGNORE_GHOST 45)
 (def MAX_TURNS_EVALUATE 5)
 
@@ -140,7 +141,7 @@
   (let [{:keys [width height top-cells uninspired-cells dropoff-locations move-towards-dropoff?]} world
         cells (if (and (seq dropoff-locations)
                        move-towards-dropoff?
-                       (<= (distance-between width height ship (first dropoff-locations))
+                       (<= (apply min (map #(distance-between width height ship %) dropoff-locations))
                            FLOW_DISTANCE))
                 dropoff-locations
                 (if (:motivated ship) top-cells uninspired-cells))
@@ -573,10 +574,11 @@
 (defn get-top-cells
   "Returns the top pct cells by score"
   [world pct]
-  (let [{:keys [cells width height ship-location-map]} world
+  (let [{:keys [cells width height ship-location-map my-id]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
-        cells (remove #(get ship-location-map (select-keys % [:x :y]))
+        cells (remove #(when-let [ship (get ship-location-map (select-keys % [:x :y]))]
+                         (not= my-id (:owner ship)))
                             ; (< (:halite %) 1000))
                       cells)
         ; best-cells (take num-cells-to-return (sort (compare-by :score desc) cells))
@@ -589,7 +591,8 @@
         ; cells (filter #(> (:halite %) 150)
         ;               (vals cells))
         best-cells cells]
-    [(take num-cells-to-return (sort (compare-by :score desc) best-cells))
+    [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
+                                                                      best-cells)))
      (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))]))
 
 (defn remove-bad-targets
@@ -816,8 +819,9 @@
                                  500)
             move-towards-dropoff? (and (seq last-dropoff-locations)
                                        build-dropoff?
-                                       (> (:halite my-player)
-                                          (- DROPOFF_COST max-halite-dropoff)))
+                                       (or (> (count (:ships my-player)) 25)
+                                           (> (:halite my-player)
+                                              (- DROPOFF_COST max-halite-dropoff))))
             updated-cell-map (decorate-cells world
                                              score-potential-cells
                                              (conj (:dropoffs my-player) my-shipyard)
@@ -862,6 +866,9 @@
                                last-dropoff-location)
             dropoff-location last-dropoff-location
             dropoff-locations (choose-dropoff-locations world dropoff-location)
+            world (assoc world :dropoff-locations dropoff-locations)
+            _ (doseq [dl dropoff-locations]
+                (flog-color world dl "Chosen dropoff" :blue))
             ; dropoff-location (first dropoff-locations)
             ; _ (when dropoff-location
             ;     (flog world dropoff-location (format "Dropoff location selected - score: %s, uninspired score: %s."

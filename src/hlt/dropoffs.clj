@@ -124,7 +124,7 @@
       ; (let [sites (conj (get-cells-within-two-range world last-dropoff-location) last-dropoff-location)
       ;       best-site (first (sort (compare-by :uninspired-score desc :dropoff-distance desc) sites))]
       ;   [best-site])
-  (let [{:keys [top-cells my-player]} world
+  (let [{:keys [top-cells uninspired-cells my-player]} world
         num-dropoffs (count (:dropoffs my-player))
         build-dropoff-distance (if (> num-dropoffs 0)
                                  BUILD_DROPOFF_DISTANCE
@@ -133,16 +133,16 @@
                                        (:dropoff-distance %)
                                        MAX_DROPOFF_LOCATION_DISTANCE)
                                    ; (>= (:score %) MIN_DROPOFF_SCORE)
-                                   (>= (:uninspired-score %) MIN_DROPOFF_SCORE))
-                                   ; (not-terrible-dropoff? world %))
-                             top-cells)
+                                   (>= (:uninspired-score %) MIN_DROPOFF_SCORE)
+                                   (not-terrible-dropoff? world %))
+                             uninspired-cells)
         nearby-sites (if (seq nearby-sites)
                        nearby-sites
                        (filter #(and (<= build-dropoff-distance
                                          (:dropoff-distance %))
-                                     (>= (:uninspired-score %) MIN_DROPOFF_SCORE))
-                                     ; (not-terrible-dropoff? world %))
-                               top-cells))]
+                                     (>= (:uninspired-score %) MIN_DROPOFF_SCORE)
+                                     (not-terrible-dropoff? world %))
+                               uninspired-cells))]
     nearby-sites))
     ;     - (log (format "Turn %d potential dropoff locations %s" (:turn world)
     ;                  ; (pr-str (take NUM_POTENTIAL_DROPOFFS (map #(select-keys % [:x :y]) (sort (compare-by :score desc) nearby-sites))))
@@ -293,6 +293,7 @@
                              (some (set [(select-keys ship [:x :y])])
                                    dropoff-locations)))
                       (:ships my-player))]
+    (log "Turn" (:turn world) "Ships at dropoff" (mapv :id ships))
     (if (or (empty? dropoff-locations) (empty? ships))
       (if-let [second-choice (choose-dropoff-ship-orig world (:ships my-player))]
         second-choice
