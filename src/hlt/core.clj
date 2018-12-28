@@ -30,7 +30,7 @@
   {2 0.52
    4 0.70})
 
-(def LAST_TURN_DROPOFF_PCT 0.80)
+(def LAST_TURN_DROPOFF_PCT 0.85)
 (def MIN_SHIPS_BEFORE_IGNORE_GHOST 45)
 (def MAX_TURNS_EVALUATE 5)
 
@@ -132,11 +132,19 @@
     :dropoff
     :collect))
 
+(def FLOW_DISTANCE 15)
+
 (defn get-top-cell-target
   "Returns the target to move after."
   [world ship]
-  (let [{:keys [width height top-cells uninspired-cells]} world
-        cells (if (:motivated ship) top-cells uninspired-cells)
+  (let [{:keys [width height top-cells uninspired-cells dropoff-locations move-towards-dropoff?]} world
+        cells (if (and (seq dropoff-locations)
+                       move-towards-dropoff?
+                       (<= (distance-between width height ship (first dropoff-locations))
+                           FLOW_DISTANCE))
+                dropoff-locations
+                (if (:motivated ship) top-cells uninspired-cells))
+        ; cells (if (:motivated ship) top-cells uninspired-cells)
         field-comparison (if (:motivated ship) :score :uninspired-score)
         closest-target (first (sort (compare-by :distance asc field-comparison desc)
                                     (map #(assoc % :distance (distance-between width height ship %))
@@ -278,7 +286,7 @@
             {:ship ship
              :target (:target ship)
              :direction best-direction
-             :reason (str "Moving to target" (dissoc (:target ship) :neighbors))})
+             :reason (str "Moving to target" (select-keys (:target ship) [:x :y :halite]))})
           (let [current-cell (get-location world ship STILL)
                 nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)
                                    :let [cell (get-location world location STILL)]
@@ -312,7 +320,7 @@
                   (log "Nearby Target is " (dissoc target :neighbors) "and best direction" best-direction)
                   {:ship ship
                    :direction best-direction
-                   :reason (str "Moving to best target in my nearby cells" (dissoc target :neighbors))})
+                   :reason (str "Moving to best target in my nearby cells" (select-keys target [:x :y :halite]))})
                 ;; Need to choose a new target
                 (let [target (get-top-cell-target world ship)
                       best-direction (get-best-gather-direction world ship target safe-cells)
@@ -322,7 +330,7 @@
                   {:ship (assoc ship :target target)
                    :target target
                    :direction best-direction
-                   :reason (str "There were no good targets so I picked" (dissoc target :neighbors))})))))))))
+                   :reason (str "There were no good targets so I picked" (select-keys target [:x :y :halite]))})))))))))
 
 (defn get-dropoff-move
   "Returns a move towards a dropoff site."
@@ -344,8 +352,8 @@
            best-choice (->> safe-cells
                             (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
                                                     (get-inspire-delta-by-move world ship %)
-                                                    (- (* 2000 (/ 1 (+ 0.5 (:dropoff-distance %))))))))
-                            (sort (compare-by :cost asc :dropoff-distance asc))
+                                                    (- (* 2000 (/ 1 (+ 0.5 (:next-dropoff-distance %))))))))
+                            (sort (compare-by :cost asc :next-dropoff-distance asc))
                             ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
                             first)
            ; safe-cells (if (and (> (:my-ship-count world) MIN_SHIPS_BEFORE_IGNORE_GHOST)
@@ -359,8 +367,8 @@
                          (->> safe-cells
                               (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
                                                       (get-inspire-delta-by-move world ship %)
-                                                      (- (* 2000 (/ 1 (+ 0.5 (:dropoff-distance %))))))))
-                              (sort (compare-by :cost asc :dropoff-distance asc))
+                                                      (- (* 2000 (/ 1 (+ 0.5 (:next-dropoff-distance %))))))))
+                              (sort (compare-by :cost asc :next-dropoff-distance asc))
                               ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
                               first)
                          best-choice)
@@ -483,17 +491,22 @@
 
 (defn decorate-cells
   "Adds dropoff distance and a score to each cell. Handles multiple shipyards and choose the min distance."
-  [world cells-to-update shipyards]
+  [world cells-to-update shipyards next-dropoffs]
   (let [dropoffs shipyards
         {:keys [width height]} world]
     (into {}
       (for [cell cells-to-update
             :let [min-distance (first (sort (map #(distance-between width height cell %) dropoffs)))
+                  next-distance (apply min min-distance (if (seq next-dropoffs)
+                                                          (map #(distance-between width height cell %)
+                                                               next-dropoffs)
+                                                          [INFINITY]))
                   [score uninspired-score] (score-cell world cell)
                   enemy-side-count (get-surrounded-enemy-count world cell)]]
                   ; uninspired-score (- uninspired-score (* 100 min-distance))]]
         [(select-keys cell [:x :y]) (assoc cell
                                            :dropoff-distance min-distance
+                                           :next-dropoff-distance next-distance
                                            :score score
                                            :uninspired-score uninspired-score
                                            :surrounded-enemy-count enemy-side-count)]))))
@@ -768,7 +781,7 @@
   (let [world (load-world)
         {:keys [my-shipyard cells width height num-players my-id other-shipyards]} world
         cells (map #(add-neighbors world %) (vals cells))
-        cells (decorate-cells world cells [my-shipyard])
+        cells (decorate-cells world cells [my-shipyard] nil)
         last-turn (total-turns height width)
         last-spawn-turn (* last-turn (get last-spawn-turn-pct num-players))
         last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
@@ -780,6 +793,7 @@
            last-round-ships nil
            last-round-other-player-ships nil
            last-dropoff-location nil
+           last-dropoff-locations nil
            banned-cells nil]
       (let [world (build-world-for-round (assoc world :cells cells) last-round-other-player-ships
                                          TURNS_TO_START_CRASHING)
@@ -796,11 +810,20 @@
                     (predict-enemy-ship-locations world ship-location-map)
                     world)
             score-potential-cells (map #(get-location world % STILL) score-potential-locations)
+            build-dropoff? (should-build-dropoff? world last-dropoff-location)
+            max-halite-dropoff (if (seq last-dropoff-locations)
+                                 (apply max (map :halite last-dropoff-locations))
+                                 500)
+            move-towards-dropoff? (and (seq last-dropoff-locations)
+                                       build-dropoff?
+                                       (> (:halite my-player)
+                                          (- DROPOFF_COST max-halite-dropoff)))
             updated-cell-map (decorate-cells world
                                              score-potential-cells
-                                             (conj (:dropoffs my-player) my-shipyard))
+                                             (conj (:dropoffs my-player) my-shipyard)
+                                             (when move-towards-dropoff?
+                                               last-dropoff-locations))
             cells (merge cells updated-cell-map)
-
             _ (doseq [cell (filter :inspired (vals cells))]
                 (flog world (select-keys cell [:x :y]) "Inspired")) ;:yellow))
             world (assoc world :cells cells)
@@ -837,26 +860,29 @@
                                         (>= (:dropoff-distance (get-location world last-dropoff-location STILL))
                                             build-dropoff-distance))
                                last-dropoff-location)
+            dropoff-location last-dropoff-location
             dropoff-locations (choose-dropoff-locations world dropoff-location)
-            dropoff-location (first dropoff-locations)
-            _ (when dropoff-location
-                (flog world dropoff-location (format "Dropoff location selected - score: %s, uninspired score: %s."
-                                                     (str (:score dropoff-location))
-                                                     (str (:uninspired-score dropoff-location)))
-                                             :blue))
-            changed-dropoff? (not= (select-keys last-dropoff-location [:x :y])
-                                   (select-keys dropoff-location [:x :y]))
-            world (if changed-dropoff?
-                    (unassign-dropoff-moves world last-dropoff-location)
-                    world)
-            world (assoc world :dropoff-locations dropoff-locations)
+            ; dropoff-location (first dropoff-locations)
+            ; _ (when dropoff-location
+            ;     (flog world dropoff-location (format "Dropoff location selected - score: %s, uninspired score: %s."
+            ;                                          (str (:score dropoff-location))
+            ;                                          (str (:uninspired-score dropoff-location)))
+            ;                                  :blue))
+            ; changed-dropoff? (not= (select-keys last-dropoff-location [:x :y])
+            ;                        (select-keys dropoff-location [:x :y]))
+            ; world (if changed-dropoff?
+            ;         (unassign-dropoff-moves world last-dropoff-location)
+            ;         world)
+            ; world (assoc world :dropoff-locations dropoff-locations)
             world (remove-bad-targets world last-dropoff-location)
             my-player (:my-player world)
-            build-dropoff? (should-build-dropoff? world)
+            ; build-dropoff? (should-build-dropoff? world last-dropoff-location)
             halite-to-save (if build-dropoff?
                              (- DROPOFF_COST (apply max 500 (map :halite dropoff-locations)))
                              0)
-            world (assoc world :reserve halite-to-save)
+            world (assoc world
+                         :reserve halite-to-save
+                         :move-towards-dropoff? (and move-towards-dropoff? build-dropoff?))
             banned-cells (remove-one-turn-from-banned-cells world banned-cells)
             _ (doseq [cell (keys banned-cells)]
                 (flog world cell "Banned cell" :green))
@@ -908,5 +934,5 @@
         (println (str spawn-command " "
                       dropoff-command " "
                       (string/join " " (map generate-move-command moves))))
-        (recur cells-without-ships last-round-ships other-player-ships dropoff-location
+        (recur cells-without-ships last-round-ships other-player-ships dropoff-location dropoff-locations
                (:banned-cells world))))))

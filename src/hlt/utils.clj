@@ -7,7 +7,9 @@
    [clojure.java.io :as clj-io]
    [cheshire.core :as json]))
 
-(def bot-name "Durbinator-v153")
+(def bot-name "Durbinator-v154")
+
+(def INFINITY 999999)
 
 (defmacro defn-timed
   "Creates a function that logs how long it took to execute the body. It supports multiarity functions
