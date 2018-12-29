@@ -326,11 +326,15 @@
 (defn get-cells-within-three-range
   "Returns all the cells within two range of the current cell."
   [world cell]
-  (for [directions (concat exactly-one-range-possibilities exactly-two-range-possibilities)
-        :let [[first-dir second-dir] directions
+  (for [directions (concat exactly-one-range-possibilities exactly-two-range-possibilities
+                           exactly-three-range-possibilities)
+        :let [[first-dir second-dir third-dir] directions
               next-cell (get-location world cell first-dir)
               next-cell (if second-dir
                           (get-location world next-cell second-dir)
+                          next-cell)
+              next-cell (if third-dir
+                          (get-location world next-cell third-dir)
                           next-cell)]]
     next-cell))
 
