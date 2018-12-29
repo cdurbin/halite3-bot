@@ -482,7 +482,7 @@
   "Sets a score for a cell."
   [world cell]
   ; (log "Scoring cell:" cell)
-  (let [surrounding-cells (get-cells-within-two-range world cell)]
+  (let [surrounding-cells (get-cells-within-three-range world cell)]
     [(+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
         (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
      ; (+ (* 4 (+ (get-bonus cell) (:halite cell))

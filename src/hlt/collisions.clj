@@ -269,9 +269,11 @@
       total
       (let [my-closest-base (get-closest-cell world cell (-> world :my-player :dropoffs))
             their-closest-base (get-closest-cell world cell (:enemy-dropoffs world))]
-        (if (< (:distance my-closest-base) (:distance their-closest-base))
+        (if (and (< (:distance my-closest-base) (:distance their-closest-base))
+                 (< (:distance my-closest-base) 5))
           (+ total (* 0.5 leftover))
-          (if (= (:distance my-closest-base) (:distance their-closest-base))
+          (if (or (= (:distance my-closest-base) (:distance their-closest-base))
+                  (> (:distance their-closest-base) 5))
             total
             (- total (* 0.5 leftover))))))))
 
@@ -307,7 +309,7 @@
                       low-score
                       (if (= (select-keys ship [:x :y]) (select-keys cell [:x :y]))
                         (+ low-score (* 0.25 (get-value-of-a-ship world)))
-                        low-score))]
+                        (- low-score (get-value-of-a-ship world))))]
 
       ; (flog world cell "RD: enemy-ships" enemy-ships)
       (when (seq scores)
@@ -321,42 +323,70 @@
   (when ship
     (when-let [other-ship (:ship cell)]
       (let [score (int (score-collision world ship other-ship cell))
-            score (if (or (two-player? world)
-                          (little-halite-left? world MIN_CRASH_FOR_HALITE)
-                          (< (:turns-left world) CRASH_TURNS_LEFT))
-                    score
-                    (- score (get-value-of-a-ship world)))]
+            cost-to-ram (get-cost-to-ram world ship cell)
+            score (- score cost-to-ram)]
+            ; score (if (or (two-player? world)
+            ;               (little-halite-left? world MIN_CRASH_FOR_HALITE)
+            ;               (< (:turns-left world) CRASH_TURNS_LEFT))
+            ;         score
+            ;         (- score cost-to-ram))]
         (when (> score 0)
           (flog-color world cell (str "Score:" score) :green))
         (if (two-player? world)
           (> score 0)
           (> score 100))))))
 
+; (def ram-danger-function
+;   "Maps players and map size to the version of the ram function to use."
+;   {2 {32 ram-danger-old?
+;       40 ram-danger-old?
+;       48 ram-danger-old?
+;       56 ram-danger-old?
+;       64 ram-danger-old?}
+;    4 {32 ram-danger-new?
+;       40 ram-danger-new?
+;       48 ram-danger-new?
+;       56 ram-danger-old?
+;       64 ram-danger-old?}})
+
 (def ram-danger-function
   "Maps players and map size to the version of the ram function to use."
-  {2 {32 ram-danger-old?
-      40 ram-danger-old?
-      48 ram-danger-old?
-      56 ram-danger-old?
-      64 ram-danger-old?}
+  {2 {32 ram-danger-new?
+      40 ram-danger-new?
+      48 ram-danger-new?
+      56 ram-danger-new?
+      64 ram-danger-new?}
    4 {32 ram-danger-new?
       40 ram-danger-new?
       48 ram-danger-new?
-      56 ram-danger-old?
-      64 ram-danger-old?}})
+      56 ram-danger-new?
+      64 ram-danger-new?}})
 
 (def should-ram-function
   "Maps players and map size to the version of the ram function to use."
-  {2 {32 should-ram-old?
-      40 should-ram-old?
-      48 should-ram-old?
-      56 should-ram-old?
-      64 should-ram-old?}
+  {2 {32 should-ram-new?
+      40 should-ram-new?
+      48 should-ram-new?
+      56 should-ram-new?
+      64 should-ram-new?}
    4 {32 should-ram-new?
       40 should-ram-new?
       48 should-ram-new?
-      56 should-ram-old?
-      64 should-ram-old?}})
+      56 should-ram-new?
+      64 should-ram-new?}})
+
+; (def should-ram-function
+;   "Maps players and map size to the version of the ram function to use."
+;   {2 {32 should-ram-old?
+;       40 should-ram-old?
+;       48 should-ram-old?
+;       56 should-ram-old?
+;       64 should-ram-old?}
+;    4 {32 should-ram-new?
+;       40 should-ram-new?
+;       48 should-ram-new?
+;       56 should-ram-old?
+;       64 should-ram-old?}})
 
 (defn should-ram?
   [world ship cell]
