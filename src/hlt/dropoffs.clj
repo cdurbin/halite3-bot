@@ -7,7 +7,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Dropoff management
-(def FIRST_BUILD_DROPOFF_DISTANCE 11)
+(def FIRST_BUILD_DROPOFF_DISTANCE 13)
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 40)
 (def NUM_POTENTIAL_DROPOFFS 1)

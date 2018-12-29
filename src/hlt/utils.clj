@@ -7,7 +7,7 @@
    [clojure.java.io :as clj-io]
    [cheshire.core :as json]))
 
-(def bot-name "Durbinator-v158")
+(def bot-name "Durbinator-v159")
 
 (def INFINITY 999999)
 

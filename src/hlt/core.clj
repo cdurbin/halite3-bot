@@ -61,7 +61,7 @@
 
 
 (def DELTA_CARRY 500)
-(def MAX_REWINDS 30)
+(def MAX_REWINDS 22)
 (def NUM_BAN_TURNS 7)
 
 (def get-steal-amount-by-map-size
@@ -93,7 +93,7 @@
           my-share (/ (+ amount-i-can-steal total-halite) (inc my-ship-count))]
       (or (and (two-player? world)
                (<= my-ship-count (- total-ship-count my-ship-count))
-               (> turns-left (+ 20 TURNS_TO_START_CRASHING)))
+               (> turns-left (+ 35 TURNS_TO_START_CRASHING)))
           (and (< turn last-spawn-turn)
                (or (> (/ (+ amount-i-can-steal total-halite) total-ship-count)
                       (get-in min-per-spawn-ship [num-players width]))
@@ -292,8 +292,7 @@
           (let [current-cell (get-location world ship STILL)
                 nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)
                                    :let [cell (get-location world location STILL)]
-                                   :when (or (nil? (:ship cell))
-                                             (not= my-id (-> cell :ship :owner)))
+                                   :when (safe-location? world ship location)
                                    :let [mining-info (turns-to-full-mining world ship cell)]]
                                (merge mining-info cell))
                 target (first (sort (compare-by :turns asc :halite-carried desc :dropoff-distance desc)
