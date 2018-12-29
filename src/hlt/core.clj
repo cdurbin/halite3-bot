@@ -262,7 +262,8 @@
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
   [world ship]
-  (let [directions (if (= 0 (:dropoff-distance (get-location world ship STILL)))
+  (let [my-id (:my-id world)
+        directions (if (= 0 (:dropoff-distance (get-location world ship STILL)))
                        SURROUNDING_DIRECTIONS
                        ALL_DIRECTIONS)
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) directions)
@@ -270,10 +271,10 @@
                                       ;; (not (ghost-ship? (:ship %)))
                                       (should-ram? world ship %))
                                 surrounding-cells))]
-    (if ram-cell
-      (do (log "I am going to ram with ship " ship "and cell" (select-keys ram-cell [:x :y]))
-          (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
-          (assoc ram-cell :ship ship :reason "Ramming ship."))
+    ; (if ram-cell
+    ;   (do (log "I am going to ram with ship " ship "and cell" (select-keys ram-cell [:x :y]))
+    ;       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
+    ;       (assoc ram-cell :ship ship :reason "Ramming ship."))
       (let [safe-cells (filter #(safe-location? world ship %) surrounding-cells)
             safe-cells (if (and (empty? safe-cells) (two-player? world))
                          ; (filter #(only-other-ships? world ship %) surrounding-cells)
@@ -291,7 +292,8 @@
           (let [current-cell (get-location world ship STILL)
                 nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)
                                    :let [cell (get-location world location STILL)]
-                                   :when (nil? (:ship cell))
+                                   :when (or (nil? (:ship cell))
+                                             (not= my-id (-> cell :ship :owner)))
                                    :let [mining-info (turns-to-full-mining world ship cell)]]
                                (merge mining-info cell))
                 target (first (sort (compare-by :turns asc :halite-carried desc :dropoff-distance desc)
@@ -314,24 +316,28 @@
                      (>= mined-this-turn (:last-turn-gain target)))
               {:ship ship
                :direction STILL
-               :reason "collect more from current cell than last turn gain of target."}
+               :reason (str "collect more from current cell than last turn gain of target." (select-keys target [:x :y]))}
               (if target
                 (let [best-direction (get-best-gather-direction world ship target safe-cells)
                       best-direction (or best-direction STILL)]
-                  (log "Nearby Target is " (dissoc target :neighbors) "and best direction" best-direction)
+                  (log "Nearby Target is " (select-keys target [:x :y :halite]) "and best direction" best-direction)
                   {:ship ship
                    :direction best-direction
                    :reason (str "Moving to best target in my nearby cells" (select-keys target [:x :y :halite]))})
                 ;; Need to choose a new target
-                (let [target (get-top-cell-target world ship)
-                      best-direction (get-best-gather-direction world ship target safe-cells)
-                      best-direction (or best-direction STILL)]
-                  (log "Target is " target "and best direction" best-direction)
-                  (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
-                  {:ship (assoc ship :target target)
-                   :target target
-                   :direction best-direction
-                   :reason (str "There were no good targets so I picked" (select-keys target [:x :y :halite]))})))))))))
+                (if ram-cell
+                  (do (log "I am going to ram with ship " ship "and cell" (select-keys ram-cell [:x :y]))
+                      (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
+                      (assoc ram-cell :ship ship :reason "Ramming ship."))
+                  (let [target (get-top-cell-target world ship)
+                        best-direction (get-best-gather-direction world ship target safe-cells)
+                        best-direction (or best-direction STILL)]
+                    (log "Target is " target "and best direction" best-direction)
+                    (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
+                    {:ship (assoc ship :target target)
+                     :target target
+                     :direction best-direction
+                     :reason (str "There were no good targets so I picked" (select-keys target [:x :y :halite]))})))))))))
 
 (defn get-dropoff-move
   "Returns a move towards a dropoff site."

@@ -207,8 +207,8 @@
 (defn play-out-fight
   "Figure out who will collect what from a fight based on looking out up to 7 turns..."
   [world cell my-ship their-ship]
-  (let [;; Include the inspiration bonus. Assume if I'm inspired they are too.
-        multiplier (if (inspired-cell? world cell) 3 1)
+  (let [;; Include the inspiration bonus. Assume if I'm inspired they are too - since inspire can move don't count on it for full 3 times effect.
+        multiplier (if (inspired-cell? world cell) 1.8 1)
         dropped-halite (* (+ (:halite my-ship) (:halite their-ship))
                           multiplier)]
     (loop [remaining-halite dropped-halite
@@ -284,9 +284,11 @@
   ; (log "Turn " (:turn world) "SC: cell is" (select-keys cell [:ship :x :y]))
   (if (= (:my-id world) (:owner other-ship))
     (- (* -2 (get-value-of-a-ship world)) (:halite ship) (:halite other-ship))
-    (let [collisions-odds (if (ghost-ship? (:ship cell))
-                            0.1
-                            0.2)
+    (let [
+          ; collisions-odds (if (ghost-ship? (:ship cell))
+          ;                   0.1
+          ;                   0.2)
+          collisions-odds 1
           battle-diff (spoils-of-war world ship cell other-ship)
           battle-diff (- (+ battle-diff (:halite other-ship)) (:halite ship))]
       ; (if (two-player? world)
@@ -309,6 +311,7 @@
                       low-score
                       (if (= (select-keys ship [:x :y]) (select-keys cell [:x :y]))
                         (+ low-score (* 0.25 (get-value-of-a-ship world)))
+                        ; (+ low-score (* 0.25 (get-value-of-a-ship world)))
                         (- low-score (get-value-of-a-ship world))))]
 
       ; (flog world cell "RD: enemy-ships" enemy-ships)
