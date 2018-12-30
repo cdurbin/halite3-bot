@@ -61,7 +61,7 @@
 
 
 (def DELTA_CARRY 500)
-(def MAX_REWINDS 22)
+(def MAX_REWINDS 15)
 (def NUM_BAN_TURNS 7)
 
 (def get-steal-amount-by-map-size
@@ -570,11 +570,12 @@
               (let [cell (get-location updated-world ship STILL)
                     updated-world (assoc-in updated-world
                                             [:cells (select-keys cell [:x :y]) :ship] ship)
-                    surrounding-cells (when (or (little-halite-left? world MIN_CRASH_FOR_HALITE)
-                                                (<= turns-left CRASH_TURNS_LEFT)
-                                                (and (> my-ship-count MIN_SHIPS_TO_RAM_GHOST)
-                                                     (< width 50)))
-                                        (get-surrounding-cells world cell))]
+                    surrounding-cells (get-surrounding-cells world cell)]
+                    ; surrounding-cells (when (or (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                    ;                             (<= turns-left CRASH_TURNS_LEFT)
+                    ;                             (and (> my-ship-count MIN_SHIPS_TO_RAM_GHOST)
+                    ;                                  (< width 50)))
+                    ;                     (get-surrounding-cells world cell))]
                     ; surrounding-cells (when (can-move? updated-world ship)
                     ;                     (get-surrounding-cells updated-world cell))
                     ; surrounding-cells (get-surrounding-cells updated-world cell)]

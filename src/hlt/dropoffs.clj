@@ -301,7 +301,9 @@
       ;                                  dropoff-locations)))
       ;                     (:ships my-player))]
         ; (first (sort (compare-by :score desc) ships))
-      (first (sort (compare-by :score desc :dropoff-distance desc) ships)))))
+      (first (sort (compare-by :friendly-ship-count desc :score desc :dropoff-distance desc)
+                   (map #(assoc % :friendly-ship-count (get-friendly-ship-count world %))
+                        ships))))))
 
 (defn update-world-for-dropoff-ship
   "Updates player halite info based on built dropoff."

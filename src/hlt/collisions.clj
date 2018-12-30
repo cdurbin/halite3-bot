@@ -202,13 +202,18 @@
 
 (defn get-ships-in-cells
   "Returns ships from cells."
-  [world locations]
-  (keep #(get (:updated-ship-location-map world) (select-keys % [:x :y]))
-        locations))
+  ([world locations]
+   (get-ships-in-cells world locations false))
+  ([world locations use-turn-updates?]
+   (if use-turn-updates?
+     (keep #(get (:updated-ship-location-map world) (select-keys % [:x :y]))
+           locations)
+     (keep #(get (:ship-location-map world) (select-keys % [:x :y]))
+           locations))))
 
 (defn play-out-fight
   "Figure out who will collect what from a fight based on looking out up to 7 turns..."
-  [world cell my-ship their-ship]
+  [world cell my-ship their-ship use-turn-updates?]
   (let [;; Include the inspiration bonus. Assume if I'm inspired they are too - since inspire can move don't count on it for full 3 times effect.
         multiplier (if (inspired-cell? world cell) 1.8 1)
         dropped-halite (* (+ (:halite my-ship) (:halite their-ship))
@@ -219,7 +224,8 @@
            delta-carry 0
            ships (remove #(or (= (:id my-ship) (:id %))
                               (= (:id their-ship) (:id %)))
-                         (get-ships-in-cells world (conj (get-in cell [:neighbors 1]) cell)))]
+                         (get-ships-in-cells world (conj (get-in cell [:neighbors 1]) cell)
+                                             use-turn-updates?))]
       (if (or (<= remaining-halite 20)
               (> iteration 5))
         {:total total-halite :leftover remaining-halite}
@@ -259,13 +265,13 @@
                  (inc iteration)
                  total-halite
                  delta-carry
-                 (get-ships-in-cells world (get-in cell [:neighbors (inc iteration)]))))))))
+                 (get-ships-in-cells world (get-in cell [:neighbors (inc iteration)]) use-turn-updates?)))))))
 
 (defn spoils-of-war
   "Returns a value of the net halite change from a collision. This could get complicated to
   track correctly, but is probably one of the most important things to get right in this game."
-  [world my-ship cell their-ship]
-  (let [{:keys [total leftover]} (play-out-fight world cell my-ship their-ship)]
+  [world my-ship cell their-ship use-turn-updates?]
+  (let [{:keys [total leftover]} (play-out-fight world cell my-ship their-ship use-turn-updates?)]
     ; (flog world cell (str "SOW: total" total "leftover" leftover))
     (if (<= 0 leftover)
       total
@@ -291,12 +297,29 @@
           ;                   0.1
           ;                   0.2)
           collisions-odds 1
-          battle-diff (spoils-of-war world ship cell other-ship)
+          battle-diff (spoils-of-war world ship cell other-ship true)
           battle-diff (- (+ battle-diff (:halite other-ship)) (:halite ship))]
       ; (if (two-player? world)
       (* collisions-odds battle-diff))))
         ; (- (* collisions-odds battle-diff)
            ; (get-value-of-a-ship world)))))
+
+(defn score-collision-pre-turn
+  "Provides a score for choosing the given cell with regards to collision. Positive means
+  an expected gain from a collision and negative means an expected loss from a collision."
+  [world ship other-ship cell]
+  ; (log "Turn " (:turn world) "SC: cell is" (select-keys cell [:ship :x :y]))
+  (if (= (:my-id world) (:owner other-ship))
+    (- (* -2 (get-value-of-a-ship world)) (:halite ship) (:halite other-ship))
+    (let [
+          ; collisions-odds (if (ghost-ship? (:ship cell))
+          ;                   0.1
+          ;                   0.2)
+          collisions-odds 1
+          battle-diff (spoils-of-war world ship cell other-ship false)
+          battle-diff (- (+ battle-diff (:halite other-ship)) (:halite ship))]
+      ; (if (two-player? world)
+      (* collisions-odds battle-diff))))
 
 (defn ram-danger-new?
   ""
@@ -305,7 +328,7 @@
     (let [enemy-ships (filter #(and (not= (:my-id world) (:owner %))
                                     (not (ghost-ship? %)))
                               (get-ships-in-cells world (get-in cell [:neighbors 1])))
-          scores (map #(int (score-collision world ship % cell)) enemy-ships)
+          scores (map #(int (score-collision-pre-turn world ship % cell)) enemy-ships)
           low-score (when (seq scores)
                       (apply min scores))
           low-score (if (or (nil? low-score)

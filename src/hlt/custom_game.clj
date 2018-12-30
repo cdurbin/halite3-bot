@@ -133,6 +133,13 @@
             (get (:ship-location-map world) loc))
           (conj nearby-locations (select-keys location [:x :y])))))
 
+(defn get-friendly-ship-count
+  "Return a friendly ship count around a location."
+  [world location]
+  (let [nearby-ships (get-seven-range-ships world location)
+        my-id (:my-id world)]
+    (count (filter #(= my-id (:owner %)) nearby-ships))))
+
 (defn most-ships-around-cell?
   "Returns true if I have more ships around a cell (or there are no nearby ships)."
   [world cell]
@@ -368,7 +375,10 @@
             world)
           (if change?
             (assoc-in world [:updated-ship-location-map new-location] ship)
-            world))))
+            (let [ship (assoc ship :halite (min MAX_HALITE_CARRY
+                                                (+ (:halite ship)
+                                                   (get-gather-amount (get-location world ship STILL)))))]
+              (assoc-in world [:updated-ship-location-map new-location] ship))))))
 
 (defn get-stuck-ships
   "Returns ships that don't have enough halite to move."
