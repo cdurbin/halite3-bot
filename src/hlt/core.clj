@@ -263,9 +263,9 @@
   "Returns true if I should try to mine a cell."
   [world ship cell location]
   (let [{:keys [my-id turns-left]} world]
-    (if (or (two-player? world)
-            (little-halite-left? world MIN_CRASH_FOR_HALITE)
-            (< (:turns-left world CRASH_TURNS_LEFT)))
+    (if (or (two-player? world))
+            ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
+            ; (< (:turns-left world) CRASH_TURNS_LEFT))
       (or (nil? (:ship cell))
           (not= my-id (-> cell :ship :owner)))
       (safe-location? world ship location))))
@@ -471,7 +471,7 @@
                            "but that was because of " prior-colliding-ship))
                   move (assoc move :location location :collision colliding-ship
                                    :pre-collision prior-colliding-ship)
-                  updated-cells (add-ship-to-cell (:cells world) ship location)
+                  world (add-ship-to-cell world ship location)
                   ; updated-cells (add-ship-to-cell (:cells world)
                   ;                                 (merge ship (select-keys location [:x :y]))
                   ;                                 location)
@@ -485,7 +485,6 @@
                                       (:top-cells world))
                   moves (conj moves move)]
               {:world (assoc world
-                             :cells updated-cells
                              :top-cells updated-top-cells
                              :my-player (assoc (:my-player world) :ships updated-ships)
                              :banned-cells banned-cells)

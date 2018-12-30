@@ -203,7 +203,7 @@
 (defn get-ships-in-cells
   "Returns ships from cells."
   [world locations]
-  (keep #(get (:ship-location-map world) (select-keys % [:x :y]))
+  (keep #(get (:updated-ship-location-map world) (select-keys % [:x :y]))
         locations))
 
 (defn play-out-fight
@@ -327,7 +327,7 @@
   [world ship cell]
   (when ship
     (when-let [other-ship (:ship cell)]
-      (when (< (:halite ship) (:halite other-ship))
+      ; (when (< (:halite ship) (:halite other-ship))
         (let [score (int (score-collision world ship other-ship cell))
               cost-to-ram (get-cost-to-ram world ship cell)
               score (- score cost-to-ram)]
@@ -340,7 +340,7 @@
             (flog-color world cell (str "Score:" score) :green))
           (if (two-player? world)
             (> score 0)
-            (> score 100)))))))
+            (> score 100))))))
 
 ; (def ram-danger-function
 ;   "Maps players and map size to the version of the ram function to use."

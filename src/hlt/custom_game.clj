@@ -348,11 +348,27 @@
   (log "Move for ship " (-> move :ship :id) "was direction" (:direction move) "because:" (:reason move))
   (format (str "%s %d %s") MOVE (-> move :ship :id) (:direction move)))
 
+(comment
+ (let [abc {:a {:b 1 :c 2} :d 1}]
+   (update abc :a dissoc :c)))
+
 (defn add-ship-to-cell
   "Adds a ship to a given cell."
-  [cells ship location]
+  [world ship location]
   (log "ASTC: " (:id ship) "at location" (select-keys location [:x :y]))
-  (assoc-in cells [(select-keys location [:x :y]) :ship] ship))
+  (let [old-location (select-keys ship [:x :y])
+        new-location (select-keys location [:x :y])
+        change? (not= old-location new-location)
+        perform-dissoc? (and change?
+                             (= (:id ship) (get-in world [:updated-ship-location-map old-location :id])))]
+    (as-> world world
+          (assoc-in world [:cells new-location :ship] ship)
+          (if perform-dissoc?
+            (update world :updated-ship-location-map dissoc old-location)
+            world)
+          (if change?
+            (assoc-in world [:updated-ship-location-map new-location] ship)
+            world))))
 
 (defn get-stuck-ships
   "Returns ships that don't have enough halite to move."
@@ -619,7 +635,7 @@
                :enemy-dropoffs enemy-dropoffs :total-other-ship-halite total-other-ship-halite
                :my-id my-id :updated-cells updated-cells :other-players other-players}
         ship-location-map (build-ship-location-map world (> turns-left turns-to-start-crashing))
-        world (assoc world :ship-location-map ship-location-map)
+        world (assoc world :ship-location-map ship-location-map :updated-ship-location-map ship-location-map)
         other-player-ships (mapcat :ships other-players)
         changed-locations (get-changed-locations-for-ships last-round-other-player-ships
                                                            other-player-ships)
