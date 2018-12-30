@@ -256,13 +256,7 @@
 (defn enough-nearby-gather-halite
   "Returns true if there is enought halite to gather to warrant a new dropoff."
   [world cell]
-  (let [nearby-cells (get-cells world cell (concat exactly-one-range-possibilities
-                                                   exactly-two-range-possibilities
-                                                   exactly-three-range-possibilities
-                                                   exactly-four-range-possibilities
-                                                   exactly-five-range-possibilities
-                                                   exactly-six-range-possibilities
-                                                   exactly-seven-range-possibilities))]
+  (let [nearby-cells (get-seven-range-cells world cell)]
     (>= (reduce + (map :halite nearby-cells))
         REQUIRED_NEARBY_HALITE)))
 
@@ -272,12 +266,13 @@
   (let [{:keys [my-player]} world
         my-ships (:ships my-player)
         potential-ships (filter (fn [ship]
-                                  (and (>= (:dropoff-distance ship) USEFUL_DROPOFF_DISTANCE)
-                                       (>= (+ (:halite my-player) (:halite ship) (:cell-halite ship))
-                                           DROPOFF_COST)
-                                       (not (at-enemy-dropoff? world ship))
-                                       (enough-nearby-ship-halite world ship)
-                                       (enough-nearby-gather-halite world ship)))
+                                  (let [cell (get-location world ship STILL)]
+                                    (and (>= (:dropoff-distance ship) USEFUL_DROPOFF_DISTANCE)
+                                         (>= (+ (:halite my-player) (:halite ship) (:cell-halite ship))
+                                             DROPOFF_COST)
+                                         (not (at-enemy-dropoff? world ship))
+                                         (enough-nearby-ship-halite world cell)
+                                         (enough-nearby-gather-halite world cell))))
                                 my-ships)]
     (first (sort (compare-by :dropoff-distance desc) potential-ships))))
 

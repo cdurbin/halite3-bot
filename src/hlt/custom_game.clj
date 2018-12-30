@@ -8,6 +8,47 @@
 
 (def GHOST "ghost")
 
+(defn get-surrounding-cells
+  "Returns cells within one range of my location."
+  [world location]
+  (map #(get (:cells world) %)
+       (if (:neighbors location)
+         (get-in location [:neighbors 1])
+         (get-in (get-location world location STILL) [:neighbors 1]))))
+
+(defn get-two-range-cells
+  "Returns cells within two range of my location."
+  [world cell]
+  (when (nil? (get-in cell [:neighbors 1]))
+    (/ 0 0))
+  (map #(get (:cells world) %)
+       (concat (get-in cell [:neighbors 1])
+               (get-in cell [:neighbors 2]))))
+
+(defn get-three-range-cells
+  "Returns cells within three range of my location."
+  [world cell]
+  (when (nil? (get-in cell [:neighbors 1]))
+    (/ 0 0))
+  (map #(get (:cells world) %)
+       (concat (get-in cell [:neighbors 1])
+               (get-in cell [:neighbors 2])
+               (get-in cell [:neighbors 3]))))
+
+(defn get-seven-range-cells
+  "Returns cells within seven range of my location."
+  [world cell]
+  (when (nil? (get-in cell [:neighbors 1]))
+    (/ 0 0))
+  (map #(get (:cells world) %)
+       (concat (get-in cell [:neighbors 1])
+               (get-in cell [:neighbors 2])
+               (get-in cell [:neighbors 3])
+               (get-in cell [:neighbors 4])
+               (get-in cell [:neighbors 5])
+               (get-in cell [:neighbors 6])
+               (get-in cell [:neighbors 7]))))
+
 (defn get-one-range-ships
   "Returns any ships nearby a location (within one range)."
   [world location]
@@ -59,20 +100,6 @@
                                  (get-in cell [:neighbors 3])
                                  (get-in cell [:neighbors 4])
                                  (get-in cell [:neighbors 5]))]
-    (keep (fn [loc]
-            (get (:ship-location-map world) loc))
-          (conj nearby-locations (select-keys location [:x :y])))))
-
-(defn get-six-range-ships
-  "Returns any ships nearby a location (within inspiration range)."
-  [world location]
-  (let [cell (get-location world location STILL)
-        nearby-locations (concat (get-in cell [:neighbors 1])
-                                 (get-in cell [:neighbors 2])
-                                 (get-in cell [:neighbors 3])
-                                 (get-in cell [:neighbors 4])
-                                 (get-in cell [:neighbors 5])
-                                 (get-in cell [:neighbors 6]))]
     (keep (fn [loc]
             (get (:ship-location-map world) loc))
           (conj nearby-locations (select-keys location [:x :y])))))
@@ -266,7 +293,7 @@
   (let [my-id (:my-id world)
         current-cell (get-location world ship STILL)]
     (when (or (nil? chosen-cell) (>= (:dropoff-distance chosen-cell) (:dropoff-distance current-cell)))
-      (let [cells (get-cells-within-two-range world ship)
+      (let [cells (get-two-range-cells world current-cell)
             surrounding-ships (filter :ship cells)]
         (some? (first (filter #(and (not= my-id (-> % :ship :owner))
                                     (< (:dropoff-distance %) (:dropoff-distance current-cell)))
@@ -550,7 +577,8 @@
         five-range-neighbors (get-locations world cell exactly-five-range-possibilities)
         six-range-neighbors (get-locations world cell exactly-six-range-possibilities)
         seven-range-neighbors (get-locations world cell exactly-seven-range-possibilities)
-        inspiration-neighbors (get-locations-within-four-range world cell)
+        inspiration-neighbors (concat one-range-neighbors two-range-neighbors three-range-neighbors
+                                      four-range-neighbors)
         neighbors {1 one-range-neighbors
                    2 two-range-neighbors
                    3 three-range-neighbors

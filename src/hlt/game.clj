@@ -129,11 +129,6 @@
   [cell]
   (Math/ceil (* GATHER_AMOUNT (+ (:halite cell) (get-bonus cell)))))
 
-(defn get-surrounding-cells
-  "Returns cells surrounding the current cell."
-  [world cell]
-  (map #(get-location world cell %) SURROUNDING_DIRECTIONS))
-
 (defn can-move?
   "Returns true if the ship can move."
   [world ship]
@@ -305,70 +300,6 @@
    [SOUTH WEST WEST WEST WEST WEST WEST]
    [SOUTH EAST EAST EAST EAST EAST EAST]])
 
-(def inspiration-range-possibilities
-  (concat exactly-one-range-possibilities
-          exactly-two-range-possibilities
-          exactly-three-range-possibilities
-          exactly-four-range-possibilities))
-
-
-(defn get-cells-within-two-range
-  "Returns all the cells within two range of the current cell."
-  [world cell]
-  (for [directions (concat exactly-one-range-possibilities exactly-two-range-possibilities)
-        :let [[first-dir second-dir] directions
-              next-cell (get-location world cell first-dir)
-              next-cell (if second-dir
-                          (get-location world next-cell second-dir)
-                          next-cell)]]
-    next-cell))
-
-(defn get-cells-within-three-range
-  "Returns all the cells within two range of the current cell."
-  [world cell]
-  (for [directions (concat exactly-one-range-possibilities exactly-two-range-possibilities
-                           exactly-three-range-possibilities)
-        :let [[first-dir second-dir third-dir] directions
-              next-cell (get-location world cell first-dir)
-              next-cell (if second-dir
-                          (get-location world next-cell second-dir)
-                          next-cell)
-              next-cell (if third-dir
-                          (get-location world next-cell third-dir)
-                          next-cell)]]
-    next-cell))
-
-(defn get-locations-within-four-range
-  "Returns all the locations within four range of the current cell."
-  [world cell]
-  (let [{:keys [width height]} world]
-    (for [directions inspiration-range-possibilities
-          :let [[first-dir second-dir third-dir fourth-dir] directions
-                next-cell (get-x-and-y cell first-dir width height)
-                next-cell (if second-dir
-                            (get-x-and-y next-cell second-dir width height)
-                            next-cell)
-                next-cell (if third-dir
-                            (get-x-and-y next-cell third-dir width height)
-                            next-cell)
-                next-cell (if fourth-dir
-                            (get-x-and-y next-cell fourth-dir width height)
-                            next-cell)]]
-      next-cell)))
-
-; (defn get-locations-at-five-range
-;   "Returns all the locations in exactly five range of the current cell."
-;   [world cell]
-;   (let [{:keys [width height]} world]
-;     (for [directions exactly-five-range-possibilities
-;           :let [[first-dir second-dir third-dir fourth-dir fifth-dir] directions]]
-;       (-> cell
-;           (get-x-and-y first-dir width height)
-;           (get-x-and-y second-dir width height)
-;           (get-x-and-y third-dir width height)
-;           (get-x-and-y fourth-dir width height)
-;           (get-x-and-y fifth-dir width height)))))
-
 (defn get-end-location
   "Returns the last location following a list of directions."
   [world cell directions]
@@ -384,22 +315,6 @@
   [world cell directions-coll]
   (for [directions directions-coll]
     (get-end-location world cell directions)))
-
-(defn get-end-cell
-  "Returns the last cell following a list of directions."
-  [world cell directions]
-  (loop [next-cell cell
-         directions directions]
-    (if (seq directions)
-      (recur (get-location world next-cell (first directions))
-             (rest directions))
-      next-cell)))
-
-(defn get-cells
-  "Returns all cells based on a cell and a collection of directions."
-  [world cell directions-coll]
-  (for [directions directions-coll]
-    (get-end-cell world cell directions)))
 
 (defn total-turns
   "Returns total turns before the game is over."

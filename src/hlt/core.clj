@@ -293,7 +293,7 @@
         (if (:target ship)
           (let [best-direction (get-best-direction world ship (:target ship) safe-cells)
                 best-direction (or best-direction STILL)]
-            (log "Target is " (:target ship) "and best direction" best-direction)
+            (log "Target is " (select-keys (:target ship) [:x :y]) "and best direction" best-direction)
             (flog world (:target ship) (format "Ship %d existing target" (:id ship)) :orange)
             {:ship ship
              :target (:target ship)
@@ -335,7 +335,7 @@
                    :reason (str "Moving to best target in my nearby cells" (select-keys target [:x :y :halite]))})
                 ;; Need to choose a new target
                 (if ram-cell
-                  (do (log "I am going to ram with ship " ship "and cell" (select-keys ram-cell [:x :y]))
+                  (do (log "I am going to ram with ship " (:id ship) "and cell" (select-keys ram-cell [:x :y]))
                       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
                       (assoc ram-cell :ship ship :reason "Ramming ship."))
                   (let [target (get-top-cell-target world ship)
@@ -497,7 +497,7 @@
   "Sets a score for a cell."
   [world cell]
   ; (log "Scoring cell:" cell)
-  (let [surrounding-cells (get-cells-within-three-range world cell)]
+  (let [surrounding-cells (get-three-range-cells world cell)]
     [(+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
         (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
      ; (+ (* 4 (+ (get-bonus cell) (:halite cell))
@@ -649,7 +649,7 @@
                                                     (and ship
                                                          ; (not= GHOST (:id ship))
                                                          (not= my-id (:owner ship))))
-                                                 (get-cells-within-two-range world location)))))]
+                                                 (get-two-range-cells world (get-location world location STILL))))))]
             [location turns]))))
 
 ; (defn get-value-of-a-ship

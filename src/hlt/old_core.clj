@@ -662,7 +662,7 @@
   "Sets a score for a cell."
   [world cell]
   ; (log "Scoring cell:" cell)
-  (let [surrounding-cells (get-cells-within-two-range world cell)]
+  (let [surrounding-cells (get-two-range-cells world cell)]
     [(+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
         (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
      ; (+ (* 4 (+ (get-bonus cell) (:halite cell))
@@ -840,7 +840,7 @@
                                                     (and ship
                                                          ; (not= GHOST (:id ship))
                                                          (not= my-id (:owner ship))))
-                                                 (get-cells-within-two-range world location)))))]
+                                                 (get-two-range-cells world (get-location world location STILL))))))]
             [location turns]))))
 
 (defn -main
