@@ -327,19 +327,20 @@
   [world ship cell]
   (when ship
     (when-let [other-ship (:ship cell)]
-      (let [score (int (score-collision world ship other-ship cell))
-            cost-to-ram (get-cost-to-ram world ship cell)
-            score (- score cost-to-ram)]
-            ; score (if (or (two-player? world)
-            ;               (little-halite-left? world MIN_CRASH_FOR_HALITE)
-            ;               (< (:turns-left world) CRASH_TURNS_LEFT))
-            ;         score
-            ;         (- score cost-to-ram))]
-        (when (> score 0)
-          (flog-color world cell (str "Score:" score) :green))
-        (if (two-player? world)
-          (> score 0)
-          (> score 100))))))
+      (when (< (:halite ship) (:halite other-ship))
+        (let [score (int (score-collision world ship other-ship cell))
+              cost-to-ram (get-cost-to-ram world ship cell)
+              score (- score cost-to-ram)]
+              ; score (if (or (two-player? world)
+              ;               (little-halite-left? world MIN_CRASH_FOR_HALITE)
+              ;               (< (:turns-left world) CRASH_TURNS_LEFT))
+              ;         score
+              ;         (- score cost-to-ram))]
+          (when (> score 0)
+            (flog-color world cell (str "Score:" score) :green))
+          (if (two-player? world)
+            (> score 0)
+            (> score 100)))))))
 
 ; (def ram-danger-function
 ;   "Maps players and map size to the version of the ram function to use."
