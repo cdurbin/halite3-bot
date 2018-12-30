@@ -259,11 +259,21 @@
            :halite-carried (min MAX_HALITE_CARRY halite-carried)}
           (recur cell-halite halite-carried (inc turns)))))))
 
+(defn should-mine-cell?
+  "Returns true if I should try to mine a cell."
+  [world ship cell location]
+  (let [{:keys [my-id turns-left]} world]
+    (if (or (two-player? world)
+            (little-halite-left? world MIN_CRASH_FOR_HALITE)
+            (< (:turns-left world CRASH_TURNS_LEFT)))
+      (or (nil? (:ship cell))
+          (not= my-id (-> cell :ship :owner)))
+      (safe-location? world ship location))))
+
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
   [world ship]
-  (let [my-id (:my-id world)
-        directions (if (= 0 (:dropoff-distance (get-location world ship STILL)))
+  (let [directions (if (= 0 (:dropoff-distance (get-location world ship STILL)))
                        SURROUNDING_DIRECTIONS
                        ALL_DIRECTIONS)
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) directions)
@@ -292,7 +302,7 @@
           (let [current-cell (get-location world ship STILL)
                 nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)
                                    :let [cell (get-location world location STILL)]
-                                   :when (safe-location? world ship location)
+                                   :when (should-mine-cell? world ship cell location)
                                    :let [mining-info (turns-to-full-mining world ship cell)]]
                                (merge mining-info cell))
                 target (first (sort (compare-by :turns asc :halite-carried desc :dropoff-distance desc)
@@ -507,15 +517,15 @@
                                                           (map #(distance-between width height cell %)
                                                                next-dropoffs)
                                                           [INFINITY]))
-                  [score uninspired-score] (score-cell world cell)
-                  enemy-side-count (get-surrounded-enemy-count world cell)]]
+                  [score uninspired-score] (score-cell world cell)]]
+                  ; enemy-side-count (get-surrounded-enemy-count world cell)]]
                   ; uninspired-score (- uninspired-score (* 100 min-distance))]]
         [(select-keys cell [:x :y]) (assoc cell
                                            :dropoff-distance min-distance
                                            :next-dropoff-distance next-distance
                                            :score score
-                                           :uninspired-score uninspired-score
-                                           :surrounded-enemy-count enemy-side-count)]))))
+                                           :uninspired-score uninspired-score)]))))
+                                           ; :surrounded-enemy-count enemy-side-count)]))))
 
 (defn decorate-ship
   "Adds extra keys to a ship that are useful."

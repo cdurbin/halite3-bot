@@ -123,6 +123,8 @@
 (defn ram-danger-old?
   "Returns true if my ship might get rammed."
   [world ship cell]
+  ;; If trying to use this function again make sure to populate the surrounded-enemy-count
+  (/ 0 0)
   (let [{:keys [total-halite total-ship-count turns-left my-id]} world]
     (and ship
          (> turns-left TURNS_TO_START_CRASHING)
