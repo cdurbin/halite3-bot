@@ -200,16 +200,24 @@
 (def odds-of-collision-still 0.2)
 (def odds-of-collision-moving 0.1)
 
+; (defn get-ships-in-cells
+;   "Returns ships from cells."
+;   ([world locations]
+;    (get-ships-in-cells world locations false))
+;   ([world locations use-turn-updates?]
+;    (if use-turn-updates?
+;      (keep #(get (:updated-ship-location-map world) (select-keys % [:x :y]))
+;            locations)
+;      (keep #(get (:ship-location-map world) (select-keys % [:x :y]))
+;            locations))))
+
 (defn get-ships-in-cells
   "Returns ships from cells."
   ([world locations]
    (get-ships-in-cells world locations false))
   ([world locations use-turn-updates?]
-   (if use-turn-updates?
-     (keep #(get (:updated-ship-location-map world) (select-keys % [:x :y]))
-           locations)
-     (keep #(get (:ship-location-map world) (select-keys % [:x :y]))
-           locations))))
+   (keep #(get (:updated-ship-location-map world) (select-keys % [:x :y]))
+         locations)))
 
 (defn play-out-fight
   "Figure out who will collect what from a fight based on looking out up to 7 turns..."

@@ -47,6 +47,18 @@
       56 14
       64 16}})
 
+; (def halite-burn-map
+;   {2 {32 20
+;       40 20
+;       48 20
+;       56 20
+;       64 20}
+;    4 {32 20
+;       40 20
+;       48 20
+;       56 20
+;       64 20}})
+
 (def min-per-spawn-ship
   {2 {32 810
       40 820
@@ -262,13 +274,16 @@
 (defn should-mine-cell?
   "Returns true if I should try to mine a cell."
   [world ship cell location]
-  (let [{:keys [my-id turns-left]} world]
-    (if (or (two-player? world))
-            ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
-            ; (< (:turns-left world) CRASH_TURNS_LEFT))
-      (or (nil? (:ship cell))
-          (not= my-id (-> cell :ship :owner)))
-      (safe-location? world ship location))))
+  (let [{:keys [my-id turns-left targets]} world]
+    ; (when-not (nil? (get targets (select-keys location [:x :y])))
+    ;   (log "CDD-turn" (:turn world) "Targets were set for" location))
+    (and (nil? (get targets (select-keys location [:x :y])))
+         (if (or (two-player? world))
+                ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                ; (< (:turns-left world) CRASH_TURNS_LEFT))
+           (or (nil? (:ship cell))
+               (not= my-id (-> cell :ship :owner)))
+           (safe-location? world ship location)))))
 
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
@@ -332,6 +347,7 @@
                   (log "Nearby Target is " (select-keys target [:x :y :halite]) "and best direction" best-direction)
                   {:ship ship
                    :direction best-direction
+                   :target target
                    :reason (str "Moving to best target in my nearby cells" (select-keys target [:x :y :halite]))})
                 ;; Need to choose a new target
                 (if ram-cell
@@ -483,8 +499,12 @@
                                                    (select-keys cell [:x :y])))
                                               (:top-cells world))
                                       (:top-cells world))
-                  moves (conj moves move)]
+                  moves (conj moves move)
+                  targets (if target
+                            (assoc (:targets world) (select-keys target [:x :y]) true)
+                            (:targets world))]
               {:world (assoc world
+                             :targets targets
                              :top-cells updated-top-cells
                              :my-player (assoc (:my-player world) :ships updated-ships)
                              :banned-cells banned-cells)
@@ -813,7 +833,7 @@
            last-dropoff-location nil
            last-dropoff-locations nil
            banned-cells nil]
-      (let [world (build-world-for-round (assoc world :cells cells) last-round-other-player-ships
+      (let [world (build-world-for-round (assoc world :cells cells :targets nil) last-round-other-player-ships
                                          TURNS_TO_START_CRASHING)
             {:keys [ship-location-map potential-locations updated-cells my-player turns-left
                     players turn cells other-players
