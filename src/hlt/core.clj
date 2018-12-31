@@ -277,13 +277,13 @@
   (let [{:keys [my-id turns-left targets]} world]
     ; (when-not (nil? (get targets (select-keys location [:x :y])))
     ;   (log "CDD-turn" (:turn world) "Targets were set for" location))
-    (and (nil? (get targets (select-keys location [:x :y])))
-         (if (or (two-player? world))
-                ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
-                ; (< (:turns-left world) CRASH_TURNS_LEFT))
-           (or (nil? (:ship cell))
-               (not= my-id (-> cell :ship :owner)))
-           (safe-location? world ship location)))))
+    ; (and (nil? (get targets (select-keys location [:x :y])))
+    (if (or (two-player? world))
+           ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
+           ; (< (:turns-left world) CRASH_TURNS_LEFT))
+      (or (nil? (:ship cell))
+          (not= my-id (-> cell :ship :owner)))
+      (safe-location? world ship location))))
 
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
@@ -347,7 +347,7 @@
                   (log "Nearby Target is " (select-keys target [:x :y :halite]) "and best direction" best-direction)
                   {:ship ship
                    :direction best-direction
-                   :target target
+                   ; :target target
                    :reason (str "Moving to best target in my nearby cells" (select-keys target [:x :y :halite]))})
                 ;; Need to choose a new target
                 (if ram-cell
@@ -499,12 +499,12 @@
                                                    (select-keys cell [:x :y])))
                                               (:top-cells world))
                                       (:top-cells world))
-                  moves (conj moves move)
-                  targets (if target
-                            (assoc (:targets world) (select-keys target [:x :y]) true)
-                            (:targets world))]
+                  moves (conj moves move)]
+                  ; targets (if target
+                  ;           (assoc (:targets world) (select-keys target [:x :y]) true)
+                  ;           (:targets world))]
               {:world (assoc world
-                             :targets targets
+                             ; :targets targets
                              :top-cells updated-top-cells
                              :my-player (assoc (:my-player world) :ships updated-ships)
                              :banned-cells banned-cells)
