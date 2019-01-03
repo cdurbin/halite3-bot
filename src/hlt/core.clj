@@ -17,8 +17,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (def DROP_OFF_AMOUNT 950)
-(def DROP_OFF_AMOUNT_EARLY 800)
-(def DROP_OFF_AMOUNT_LATE 550)
+(def DROP_OFF_AMOUNT_EARLY 950)
+(def DROP_OFF_AMOUNT_LATE 650)
 (def NUM_EARLY_SHIPS 9)
 (def BACK_TO_GATHER_AMOUNT 650)
 (def MIN_DROPOFF_DISTANCE 4)
@@ -41,10 +41,10 @@
       48 12
       56 8
       64 8}
-   4 {32 12
-      40 12
-      48 14
-      56 14
+   4 {32 16
+      40 16
+      48 16
+      56 16
       64 16}})
 
 ; (def halite-burn-map
@@ -119,6 +119,9 @@
        (let [{:keys [num-players width]} world
              cell (get-in world [:cells (select-keys ship [:x :y])])
              halite-burn (get-in halite-burn-map [num-players width])]
+             ; halite-burn (if (= :dropoff (:mode ship))
+             ;               halite-burn)]
+
              ; halite-burn (if (= :collect (:mode ship))
              ;               MAX_HALITE_BURN_COLLECT
              ;               MAX_HALITE_BURN_DROPOFF)]
@@ -139,9 +142,9 @@
   (if (or (>= (:dropoff-distance cell) (- turns-left TURNS_TO_START_CRASHING))
           (>= (:halite ship) drop-off-amount)
           (and (= :dropoff (:mode ship))
-               (>= (:halite ship) BACK_TO_GATHER_AMOUNT))
-          (and (>= (:halite ship) BACK_TO_GATHER_AMOUNT)
-               (<= (:dropoff-distance cell) MIN_DROPOFF_DISTANCE)))
+               (>= (:halite ship) BACK_TO_GATHER_AMOUNT)))
+          ; (and (>= (:halite ship) BACK_TO_GATHER_AMOUNT)
+          ;      (<= (:dropoff-distance cell) MIN_DROPOFF_DISTANCE)))
     :dropoff
     :collect))
 
@@ -590,15 +593,14 @@
               (let [cell (get-location updated-world ship STILL)
                     updated-world (assoc-in updated-world
                                             [:cells (select-keys cell [:x :y]) :ship] ship)
-                    surrounding-cells (get-surrounding-cells world cell)]
-                    ; surrounding-cells (when (or (little-halite-left? world MIN_CRASH_FOR_HALITE)
-                    ;                             (<= turns-left CRASH_TURNS_LEFT)
-                    ;                             (and (> my-ship-count MIN_SHIPS_TO_RAM_GHOST)
-                    ;                                  (< width 50)))
-                    ;                     (get-surrounding-cells world cell))]
+                    ; surrounding-cells (get-surrounding-cells world cell)
+                    surrounding-cells (when (or (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                                                (<= turns-left CRASH_TURNS_LEFT)
+                                                (and (> my-ship-count MIN_SHIPS_TO_RAM_GHOST)
+                                                     (< width 50)))
+                                        (get-surrounding-cells updated-world cell))]
                     ; surrounding-cells (when (can-move? updated-world ship)
                     ;                     (get-surrounding-cells updated-world cell))
-                    ; surrounding-cells (get-surrounding-cells updated-world cell)]
                 (reduce (partial add-ghost-to-cell ship)
                         updated-world
                         surrounding-cells)))
@@ -667,9 +669,9 @@
                 :when (and (> turns 0)
                            (some? (first (filter #(let [ship (:ship %)]
                                                     (and ship
-                                                         ; (not= GHOST (:id ship))
+                                                         (not= GHOST (:id ship))
                                                          (not= my-id (:owner ship))))
-                                                 (get-two-range-cells world (get-location world location STILL))))))]
+                                                 (get-three-range-cells world (get-location world location STILL))))))]
             [location turns]))))
 
 ; (defn get-value-of-a-ship

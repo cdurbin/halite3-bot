@@ -11,9 +11,12 @@
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 30)
 (def NUM_POTENTIAL_DROPOFFS 1)
-(def MIN_DROPOFF_SCORE 6500)
+; (def MIN_DROPOFF_SCORE 6500)
+; (def MIN_DROPOFF_SCORE 6000)
+(def MIN_DROPOFF_SCORE 5000)
 (def MIN_SHIPS_PER_DROPOFF 10)
 (def MIN_SHIPS_FOR_FIRST_DROPOFF 15)
+(def MIN_SHIPS_FOR_FIRST_DROPOFF_SMALL_MAP 14)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
 
 (def FAR_DROPOFF 25)
@@ -26,16 +29,26 @@
 (def USEFUL_DROPOFF_DISTANCE 16)
 
 (def min-per-ship-to-build-dropoff
-  {2 {32 1410
-      40 1410
-      48 1410
-      56 1110
-      64 1110}
-   4 {32 380
-      40 380
-      48 350
-      56 330
-      64 350}})
+  {2 {32 50
+      40 50
+      48 50
+      56 50
+      64 50}
+   4 {32 5
+      40 5
+      48 5
+      56 5
+      64 5}})
+  ; {2 {32 1410
+  ;     40 1410
+  ;     48 1410
+  ;     56 1110
+  ;     64 1110}}
+   ; 4 {32 380
+   ;    40 380
+   ;    48 350
+   ;    56 330
+   ;    64 350}})
 
 (defn get-dropoff-distance
   "Returns the number of cells between dropoffs to decide what to build."
@@ -166,7 +179,11 @@
                                         players))
         total-ship-count (inc total-ship-count)
         my-ship-count (count (:ships my-player))
-        my-num-dropoffs (inc (count (:dropoffs my-player)))]
+        my-num-dropoffs (inc (count (:dropoffs my-player)))
+        ships-needed-for-first-dropoff (if (and (not (two-player? world))
+                                                (< width 45))
+                                         MIN_SHIPS_FOR_FIRST_DROPOFF_SMALL_MAP
+                                         MIN_SHIPS_FOR_FIRST_DROPOFF)]
     (log "Total halite:" total-halite "total-ship-count" total-ship-count)
     (log "Calculation of halite per ship:" (int (/ total-halite total-ship-count)))
     (log "Turn is " turn "last dropoff-turn is" last-dropoff-turn)
@@ -174,7 +191,7 @@
           (if last-dropoff-location
             (< turn (+ 10 last-dropoff-turn))
             (< turn last-dropoff-turn))
-          (> my-ship-count (+ MIN_SHIPS_FOR_FIRST_DROPOFF
+          (> my-ship-count (+ ships-needed-for-first-dropoff
                               (* MIN_SHIPS_PER_DROPOFF (dec my-num-dropoffs))))
           (or (seq dropoff-locations)
               (> (/ total-halite total-ship-count) (get-in min-per-ship-to-build-dropoff [num-players width]))))))
