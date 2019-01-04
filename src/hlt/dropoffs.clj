@@ -7,16 +7,16 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Dropoff management
-(def FIRST_BUILD_DROPOFF_DISTANCE 13)
+(def FIRST_BUILD_DROPOFF_DISTANCE 15)
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 30)
 (def NUM_POTENTIAL_DROPOFFS 1)
 ; (def MIN_DROPOFF_SCORE 6500)
 ; (def MIN_DROPOFF_SCORE 6000)
-(def MIN_DROPOFF_SCORE 5000)
-(def MIN_SHIPS_PER_DROPOFF 10)
+(def MIN_DROPOFF_SCORE 5300)
+(def MIN_SHIPS_PER_DROPOFF 15)
 (def MIN_SHIPS_FOR_FIRST_DROPOFF 15)
-(def MIN_SHIPS_FOR_FIRST_DROPOFF_SMALL_MAP 14)
+(def MIN_SHIPS_FOR_FIRST_DROPOFF_SMALL_MAP 13)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
 
 (def FAR_DROPOFF 25)
@@ -66,7 +66,7 @@
         my-ship-count (count my-ships)
         other-ship-count (- (count nearby-ships) (count my-ships))]
     (or (> my-ship-count 5)
-        (< (- other-ship-count my-ship-count) 3))))
+        (<= (- other-ship-count my-ship-count) 3))))
 
 ; (defn choose-dropoff-locations
 ;   "Given a bunch of choices for dropoff locations. Choose the one(s) that could be the most
@@ -332,3 +332,20 @@
                           (+ (:halite ship) (:cell-halite ship)))
           halite (- (:halite player) (max 0 dropoff-cost))]
       (assoc world :reserve 0 :my-player (assoc player :halite halite)))))
+
+(def GOOD_DROPOFF_GATHER 3000)
+
+(defn good-dropoff?
+  "Returns true if a dropoff is good."
+  [world dropoff]
+  (let [cell (get-location world dropoff STILL)
+        surrounding-cells (get-three-range-cells world cell)
+        nearby-gather (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells))]
+    (> nearby-gather GOOD_DROPOFF_GATHER)))
+
+(defn get-good-dropoffs
+  "Returns a list of good dropoffs."
+  [world]
+  nil
+  (let [my-dropoffs (-> world :my-player :dropoffs)]
+    (filter #(good-dropoff? world %) my-dropoffs)))

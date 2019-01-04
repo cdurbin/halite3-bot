@@ -153,13 +153,16 @@
 (defn get-top-cell-target
   "Returns the target to move after."
   [world ship]
-  (let [{:keys [width height top-cells uninspired-cells dropoff-locations move-towards-dropoff?]} world
+  (let [{:keys [width height top-cells uninspired-cells dropoff-locations move-towards-dropoff?
+                good-dropoffs]} world
         cells (if (and (seq dropoff-locations)
                        move-towards-dropoff?
                        (<= (apply min (map #(distance-between width height ship %) dropoff-locations))
                            FLOW_DISTANCE))
-                dropoff-locations
-                (if (:motivated ship) top-cells uninspired-cells))
+                (concat dropoff-locations good-dropoffs)
+                (if (:motivated ship)
+                  (concat top-cells good-dropoffs)
+                  (concat good-dropoffs uninspired-cells)))
         ; cells (if (:motivated ship) top-cells uninspired-cells)
         field-comparison (if (:motivated ship) :score :uninspired-score)
         closest-target (first (sort (compare-by :distance asc field-comparison desc)
@@ -339,13 +342,16 @@
                          nil
                          target)]
             (if (and target
+                     ; (= (select-keys ship [:x :y]) (select-keys target [:x :y]))
                      (some #{STILL} (map :direction safe-cells))
                      (>= mined-this-turn (:last-turn-gain target)))
               {:ship ship
                :direction STILL
                :reason (str "collect more from current cell than last turn gain of target." (select-keys target [:x :y]))}
               (if target
-                (let [best-direction (get-best-gather-direction world ship target safe-cells)
+                (let [
+                      ; safe-cells (remove #(= STILL (:direction %)) safe-cells)
+                      best-direction (get-best-gather-direction world ship target safe-cells)
                       best-direction (or best-direction STILL)]
                   (log "Nearby Target is " (select-keys target [:x :y :halite]) "and best direction" best-direction)
                   {:ship ship
@@ -358,6 +364,7 @@
                       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
                       (assoc ram-cell :ship ship :reason "Ramming ship."))
                   (let [target (get-top-cell-target world ship)
+                        ; safe-cells (remove #(= STILL (:direction %)) safe-cells)
                         best-direction (get-best-gather-direction world ship target safe-cells)
                         best-direction (or best-direction STILL)]
                     (log "Target is " target "and best direction" best-direction)
@@ -890,7 +897,9 @@
                                                  drop-off-amount)
                                  (:ships my-player))
             my-player (assoc my-player :ships decorated-ships)
+            good-dropoffs (get-good-dropoffs world)
             world (assoc world
+                         :good-dropoffs good-dropoffs
                          :my-player my-player
                          :top-cells top-cells
                          :uninspired-cells uninspired-cells
