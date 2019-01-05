@@ -17,8 +17,8 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (def DROP_OFF_AMOUNT 950)
-(def DROP_OFF_AMOUNT_EARLY 800)
-(def DROP_OFF_AMOUNT_LATE 550)
+(def DROP_OFF_AMOUNT_EARLY 950)
+(def DROP_OFF_AMOUNT_LATE 650)
 (def NUM_EARLY_SHIPS 9)
 (def BACK_TO_GATHER_AMOUNT 650)
 (def MIN_DROPOFF_DISTANCE 4)
@@ -127,9 +127,9 @@
   (if (or (>= (:dropoff-distance cell) (- turns-left TURNS_TO_START_CRASHING))
           (>= (:halite ship) drop-off-amount)
           (and (= :dropoff (:mode ship))
-               (>= (:halite ship) BACK_TO_GATHER_AMOUNT))
-          (and (>= (:halite ship) BACK_TO_GATHER_AMOUNT)
-               (<= (:dropoff-distance cell) MIN_DROPOFF_DISTANCE)))
+               (>= (:halite ship) BACK_TO_GATHER_AMOUNT)))
+          ; (and (>= (:halite ship) BACK_TO_GATHER_AMOUNT)
+          ;      (<= (:dropoff-distance cell) MIN_DROPOFF_DISTANCE)))
     :dropoff
     :collect))
 

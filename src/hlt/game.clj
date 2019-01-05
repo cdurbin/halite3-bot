@@ -356,4 +356,4 @@
         height (Integer/parseInt height-str)
         cells (load-cells height)]
     {:num-players num-players :my-id my-id :my-shipyard my-shipyard :width width :height height
-     :cells cells}))
+     :cells cells :other-shipyards other-shipyards}))
