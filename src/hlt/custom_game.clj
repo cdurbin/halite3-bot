@@ -35,6 +35,17 @@
                (get-in cell [:neighbors 2])
                (get-in cell [:neighbors 3]))))
 
+(defn get-four-range-cells
+  "Returns cells within three range of my location."
+  [world cell]
+  (when (nil? (get-in cell [:neighbors 1]))
+    (/ 0 0))
+  (map #(get (:cells world) %)
+       (concat (get-in cell [:neighbors 1])
+               (get-in cell [:neighbors 2])
+               (get-in cell [:neighbors 3])
+               (get-in cell [:neighbors 4]))))
+
 (defn get-five-range-cells
   "Returns cells within seven range of my location."
   [world cell]

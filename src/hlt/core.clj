@@ -515,6 +515,7 @@
   [world cell]
   ; (log "Scoring cell:" cell)
   (let [surrounding-cells (get-three-range-cells world cell)]
+  ; (let [surrounding-cells (get-four-range-cells world cell)]
     [(+ (* 1.25 (+ (get-bonus cell) (:halite cell)))
         (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells)))
      ; (+ (* 4 (+ (get-bonus cell) (:halite cell))
@@ -622,7 +623,8 @@
 
         ; cells (filter #(> (:halite %) 150)
         ;               (vals cells))
-        best-cells (if (or (two-player? world)
+        best-cells (if (or ; (two-player? world)
+                           (< width 35)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
                            (< turns-left CRASH_TURNS_LEFT))
                      cells
