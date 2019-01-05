@@ -350,8 +350,8 @@
       ; (flog world cell "RD: enemy-ships" enemy-ships)
       (when (seq scores)
         (if (< low-score 0)
-          (flog-color world cell (str "Scores:" (pr-str scores)) :brown)
-          (flog-color world cell (str "Scores:" (pr-str scores)) :yellow))
+          (flog world cell (str "Scores:" (pr-str scores)) :brown)
+          (flog world cell (str "Scores:" (pr-str scores)) :yellow))
         (< low-score 0)))))
 
 (defn should-ram-new?
@@ -368,7 +368,7 @@
               ;         score
               ;         (- score cost-to-ram))]
           (when (> score 0)
-            (flog-color world cell (str "Score:" score) :green))
+            (flog world cell (str "Score:" score) :green))
           (if (two-player? world)
             (> score 0)
             (> score 100))))))

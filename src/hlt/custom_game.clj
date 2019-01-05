@@ -8,6 +8,24 @@
 
 (def GHOST "ghost")
 
+(def CONTESTED_BONUS 1.5)
+
+(defn get-bonus
+  "Returns the bonus for a cell."
+  [cell]
+  (let [inspire-bonus (if (:inspired cell)
+                        (* INSPIRED_BONUS (:halite cell))
+                        0)
+        contested-bonus (if (:contested cell)
+                          (* CONTESTED_BONUS (:halite cell))
+                          0)]
+    (+ inspire-bonus contested-bonus)))
+
+(defn ^Long get-gather-amount
+  "Returns the gather amount for a cell."
+  [cell]
+  (Math/ceil (* GATHER_AMOUNT (+ (:halite cell) (get-bonus cell)))))
+
 (defn get-surrounding-cells
   "Returns cells within one range of my location."
   [world location]
@@ -552,6 +570,26 @@
         inspired? (inspired-cell? world cell)]
     (assoc cell :inspired inspired?)))
 
+(defn contested-cell?
+  "Returns true if the given cell is in a contested area."
+  [world cell]
+  (> (:dropoff-distance cell) (:enemy-dropoff-distance cell)))
+  ; (let [{:keys [ship-location-map my-id]} world]))
+    ; (when (nil? (get ship-location-map (select-keys cell [:x :y])))
+    ;   (let [ships (get-seven-range-ships world cell)
+    ;         my-ships (filter #(= my-id (:owner %)) ships)
+    ;         my-ship-count (count my-ships)]
+            ; other-ships (remove #(= my-id (:owner %)) ships)
+            ; other-ship-count (count other-ships)]
+
+(defn mark-contested-cell
+  "Adds a bonus halite to a cell if the cell would be inspired based on the current enemy ship
+  locations."
+  [world location]
+  (let [cell (get-location world location STILL)
+        contested? (contested-cell? world cell)]
+    (assoc cell :contested contested?)))
+
 (defn get-changed-locations-for-ships
   "Returns any locations which have had a ship move into or out of."
   [old-ships new-ships]
@@ -666,9 +704,13 @@
         ; _ (log "Changed locations are:" changed-locations)
         ; _ (log "Potential locations are:" potential-locations)
         inspire-update-cells (map #(inspire-cell world %) potential-locations)
-        cells (combine-cells inspire-update-cells cells)]
+        contested-update-cells (map #(mark-contested-cell world %) inspire-update-cells)
+        ; cells (combine-cells inspire-update-cells cells)
+        cells (combine-cells contested-update-cells cells)
+        contested-cells (filter :contested (vals cells))]
     (assoc world :updated-cells updated-cells :potential-locations potential-locations
-          :other-player-ships other-player-ships :cells cells)))
+           :contested-cells contested-cells
+           :other-player-ships other-player-ships :cells cells)))
 
 (defn unwind-collisions
   "Any time there is a collision try to back out moves until there is no longer a collision."

@@ -117,17 +117,17 @@
                               (select-keys cell [:x :y]))
                           bases)))))
 
-(defn get-bonus
+(defn get-bonus-basic
   "Returns the bonus for a cell."
   [cell]
   (if (:inspired cell)
     (* INSPIRED_BONUS (:halite cell))
     0))
 
-(defn ^Long get-gather-amount
+(defn ^Long get-gather-amount-basic
   "Returns the gather amount for a cell."
   [cell]
-  (Math/ceil (* GATHER_AMOUNT (+ (:halite cell) (get-bonus cell)))))
+  (Math/ceil (* GATHER_AMOUNT (+ (:halite cell) (get-bonus-basic cell)))))
 
 (defn can-move?
   "Returns true if the ship can move."
@@ -356,4 +356,4 @@
         height (Integer/parseInt height-str)
         cells (load-cells height)]
     {:num-players num-players :my-id my-id :my-shipyard my-shipyard :width width :height height
-     :cells cells}))
+     :cells cells :other-shipyards other-shipyards}))

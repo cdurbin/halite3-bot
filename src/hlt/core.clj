@@ -538,10 +538,14 @@
   "Adds dropoff distance and a score to each cell. Handles multiple shipyards and choose the min distance."
   [world cells-to-update shipyards next-dropoffs]
   (let [dropoffs shipyards
+        enemy-dropoffs (:enemy-dropoffs world)
         {:keys [width height]} world]
     (into {}
       (for [cell cells-to-update
             :let [min-distance (first (sort (map #(distance-between width height cell %) dropoffs)))
+                  min-enemy-distance (if (seq enemy-dropoffs)
+                                       (first (sort (map #(distance-between width height cell %) enemy-dropoffs)))
+                                       INFINITY)
                   next-distance (apply min min-distance (if (seq next-dropoffs)
                                                           (map #(distance-between width height cell %)
                                                                next-dropoffs)
@@ -552,6 +556,7 @@
         [(select-keys cell [:x :y]) (assoc cell
                                            :dropoff-distance min-distance
                                            :next-dropoff-distance next-distance
+                                           :enemy-dropoff-distance min-enemy-distance
                                            :score score
                                            :uninspired-score uninspired-score)]))))
                                            ; :surrounded-enemy-count enemy-side-count)]))))
@@ -915,6 +920,9 @@
             world (assoc world :dropoff-locations dropoff-locations)
             _ (doseq [dl dropoff-locations]
                 (flog-color world dl "Chosen dropoff" :blue))
+
+            _ (doseq [cc (:contested-cells world)]
+                (flog-color world cc "Contested cell" :brown))
             ; dropoff-location (first dropoff-locations)
             ; _ (when dropoff-location
             ;     (flog world dropoff-location (format "Dropoff location selected - score: %s, uninspired score: %s."
