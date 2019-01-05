@@ -80,24 +80,29 @@
       0
       (* total-other-ship-halite (get-steal-amount-by-map-size width)))))
 
-(defn should-spawn?
+(defn want-to-spawn?
+  "Returns true if player wants to spawn a turtle."
+  [world]
+  (and (enough-spawn-halite? world)
+       (let [{:keys [turn last-dropoff-turn players my-player cells num-players total-halite
+                     total-ship-count total-other-ship-halite last-spawn-turn width turns-left]} world
+             my-ship-count (count (:ships my-player))
+             my-num-dropoffs (inc (count (:dropoffs my-player)))
+             amount-i-can-steal (get-steal-amount world)
+             my-share (/ (+ amount-i-can-steal total-halite) (inc my-ship-count))]
+         (or (and (two-player? world)
+                  (<= my-ship-count (- total-ship-count my-ship-count))
+                  (> turns-left (+ 35 TURNS_TO_START_CRASHING)))
+             (and (< turn last-spawn-turn)
+                  (or (> (/ (+ amount-i-can-steal total-halite) total-ship-count)
+                         (get-in min-per-spawn-ship [num-players width]))
+                      (> my-share (* 1.25 num-players (get-in min-per-spawn-ship [num-players width])))))))))
+
+(defn can-spawn?
   "Returns true if player can spawn a turtle."
   [world shipyard]
-  (when (and (enough-spawn-halite? world)
-             (safe-location? world nil shipyard))
-    (let [{:keys [turn last-dropoff-turn players my-player cells num-players total-halite
-                  total-ship-count total-other-ship-halite last-spawn-turn width turns-left]} world
-          my-ship-count (count (:ships my-player))
-          my-num-dropoffs (inc (count (:dropoffs my-player)))
-          amount-i-can-steal (get-steal-amount world)
-          my-share (/ (+ amount-i-can-steal total-halite) (inc my-ship-count))]
-      (or (and (two-player? world)
-               (<= my-ship-count (- total-ship-count my-ship-count))
-               (> turns-left (+ 35 TURNS_TO_START_CRASHING)))
-          (and (< turn last-spawn-turn)
-               (or (> (/ (+ amount-i-can-steal total-halite) total-ship-count)
-                      (get-in min-per-spawn-ship [num-players width]))
-                   (> my-share (* 1.25 num-players (get-in min-per-spawn-ship [num-players width])))))))))
+  (and (enough-spawn-halite? world)
+       (safe-location? world nil shipyard)))
 
 (defn should-move?
   "Returns true if the ship should move."
@@ -140,7 +145,8 @@
   [world ship]
   (let [{:keys [width height top-cells uninspired-cells dropoff-locations move-towards-dropoff?
                 good-dropoffs]} world
-        cells (if (and (seq dropoff-locations)
+        cells
+              (if (and (seq dropoff-locations)
                        move-towards-dropoff?
                        (<= (apply min (map #(distance-between width height ship %) dropoff-locations))
                            FLOW_DISTANCE))
@@ -276,7 +282,8 @@
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
   [world ship]
-  (let [directions (if (= 0 (:dropoff-distance (get-location world ship STILL)))
+  (let [{:keys [my-shipyard try-to-spawn?]} world
+        directions (if (= 0 (:dropoff-distance (get-location world ship STILL)))
                        SURROUNDING_DIRECTIONS
                        ALL_DIRECTIONS)
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) directions)
@@ -288,7 +295,11 @@
     ;   (do (log "I am going to ram with ship " ship "and cell" (select-keys ram-cell [:x :y]))
     ;       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
     ;       (assoc ram-cell :ship ship :reason "Ramming ship."))
-      (let [safe-cells (filter #(safe-location? world ship %) surrounding-cells)
+      (let [safe-cells (filter #(safe-location? world ship %) (if try-to-spawn?
+                                                                (remove #(= (select-keys my-shipyard [:x :y])
+                                                                            (select-keys % [:x :y]))
+                                                                        surrounding-cells)
+                                                                surrounding-cells))
             safe-cells (if (and (empty? safe-cells) (two-player? world))
                          ; (filter #(only-other-ships? world ship %) surrounding-cells)
                          (filter #(safe-ignoring-ghost-ships? world ship %) surrounding-cells)
@@ -595,7 +606,7 @@
 (defn get-top-cells
   "Returns the top pct cells by score"
   [world pct]
-  (let [{:keys [cells width height ship-location-map my-id]} world
+  (let [{:keys [cells width height ship-location-map my-id turns-left]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
         cells (remove #(when-let [ship (get ship-location-map (select-keys % [:x :y]))]
@@ -603,15 +614,23 @@
                             ; (< (:halite %) 1000))
                       cells)
         ; best-cells (take num-cells-to-return (sort (compare-by :score desc) cells))
-        best-cells (if (two-player? world)
-                     cells
-                     (filter #(safe-location? world {:halite 1000} %) cells))
+        ; best-cells (if (two-player? world)
+        ;              cells
+        ;              (filter #(safe-location? world {:halite 1000} %) cells))
         ; cells (filter #(safe-location? world {assoc % :halite 1000} %)
         ;               cells)]
 
         ; cells (filter #(> (:halite %) 150)
         ;               (vals cells))
-        best-cells cells]
+        best-cells (if (or (two-player? world)
+                           (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                           (< turns-left CRASH_TURNS_LEFT))
+                     cells
+                     (filter (fn [cell]
+                               (let [nearby-ships (get-five-range-ships world cell)]
+                                 (when (< (count nearby-ships) 6)
+                                   cell)))
+                             cells))]
     [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
                                                                       best-cells)))
      (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))]))
@@ -913,10 +932,14 @@
             world (assoc world
                          :reserve halite-to-save
                          :move-towards-dropoff? (and move-towards-dropoff? build-dropoff?))
+
+            try-to-spawn? (want-to-spawn? world)
+
             banned-cells (remove-one-turn-from-banned-cells world banned-cells)
             _ (doseq [cell (keys banned-cells)]
                 (flog world cell "Banned cell" :green))
-            world (assoc world :banned-cells banned-cells)
+            world (assoc world :banned-cells banned-cells :try-to-spawn? try-to-spawn?)
+
             world (ignore-enemy-ships-on-base world)
             dropoff-ship (when build-dropoff?
                            (choose-dropoff-ship world))
@@ -931,7 +954,7 @@
                                          dropoff-location)
             other-ships (get-my-ships-that-can-move stuck-ships my-player)
             other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
-            collecting-ships (sort (compare-by :halite desc)
+            collecting-ships (sort (compare-by :cell-halite desc :halite desc :dropoff-distance desc)
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))
@@ -942,7 +965,7 @@
                             (unwind-collisions world moves get-moves-and-world MAX_REWINDS)
                             [world moves])
             world (update-world-for-dropoff-ship world dropoff-ship)
-            spawn-command (get-spawn-command (should-spawn? world my-shipyard))
+            spawn-command (get-spawn-command (and try-to-spawn? (can-spawn? world my-shipyard)))
             dropoff-command (get-dropoff-command dropoff-ship)
             cells-without-ships (into {}
                                   (map (fn [[k v]]
