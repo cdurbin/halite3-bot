@@ -11,7 +11,7 @@
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 40)
 (def NUM_POTENTIAL_DROPOFFS 1)
-(def MIN_DROPOFF_SCORE 6500)
+(def MIN_DROPOFF_SCORE 5500)
 (def MIN_SHIPS_PER_DROPOFF 13)
 (def MIN_SHIPS_FOR_FIRST_DROPOFF 15)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
@@ -124,7 +124,7 @@
       ; (let [sites (conj (get-cells-within-two-range world last-dropoff-location) last-dropoff-location)
       ;       best-site (first (sort (compare-by :uninspired-score desc :dropoff-distance desc) sites))]
       ;   [best-site])
-  (let [{:keys [top-cells uninspired-cells my-player]} world
+  (let [{:keys [uninspired-cells my-player]} world
         num-dropoffs (count (:dropoffs my-player))
         build-dropoff-distance (if (> num-dropoffs 0)
                                  BUILD_DROPOFF_DISTANCE
