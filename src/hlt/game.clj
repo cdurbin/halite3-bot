@@ -74,7 +74,6 @@
   "Returns {:x x :y y} for the provided reference point and direction."
   [ref-point direction max-x max-y]
   (condp = direction
-    STILL (select-keys ref-point [:x :y])
     NORTH {:x (:x ref-point) :y (normalize (dec (:y ref-point)) max-y)}
     SOUTH {:x (:x ref-point) :y (normalize (inc (:y ref-point)) max-y)}
     WEST {:x (normalize (dec (:x ref-point)) max-x) :y (:y ref-point)}
@@ -87,6 +86,11 @@
         x-and-y (get-x-and-y ref-point direction width height)]
     ; (log "Get location for " ref-point "and direction" direction "is: " (get cells x-and-y))
     (get cells x-and-y)))
+
+(defn get-cell
+  "Returns a cell."
+  [world location]
+  (get (:cells world) (select-keys location [:x :y])))
 
 (defn load-updated-cells
   "Loads cell updates for a turn."
