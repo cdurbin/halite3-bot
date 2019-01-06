@@ -47,28 +47,39 @@
       56 14
       64 16}})
 
+; (def min-per-spawn-ship
+;   {2 {32 810
+;       40 820
+;       48 830
+;       56 840
+;       64 850}
+;    4 {32 610
+;       40 640
+;       48 700
+;       56 880
+;       64 860}})
+
 (def min-per-spawn-ship
   {2 {32 810
       40 820
       48 830
       56 840
       64 850}
-   4 {32 610
-      40 640
-      48 700
-      56 880
+   4 {32 580
+      40 620
+      48 680
+      56 830
       64 860}})
-
 
 (def DELTA_CARRY 500)
 (def MAX_REWINDS 22)
 (def NUM_BAN_TURNS 7)
 
 (def get-steal-amount-by-map-size
-  {32 1.0
-   40 0.65
-   48 0.35
-   56 0.1
+  {32 0.4
+   40 0.25
+   48 0.15
+   56 0.05
    64 0.0})
 
 (defn get-steal-amount
@@ -609,11 +620,11 @@
   [world pct]
   (let [{:keys [cells width height ship-location-map my-id turns-left]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
-        cells (vals cells)
+        ; cells (take (* width height 0.6) (sort (compare-by :score desc) (vals cells)))
         cells (remove #(when-let [ship (get ship-location-map (select-keys % [:x :y]))]
                          (not= my-id (:owner ship)))
                             ; (< (:halite %) 1000))
-                      cells)
+                      (vals cells))
         ; best-cells (take num-cells-to-return (sort (compare-by :score desc) cells))
         ; best-cells (if (two-player? world)
         ;              cells
@@ -623,8 +634,8 @@
 
         ; cells (filter #(> (:halite %) 150)
         ;               (vals cells))
-        best-cells (if (or ; (two-player? world)
-                           (< width 35)
+        best-cells (if (or (two-player? world)
+                           (< width 49)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
                            (< turns-left CRASH_TURNS_LEFT))
                      cells
