@@ -207,31 +207,31 @@
   (let [{:keys [width height]} world
         end-location (select-keys end [:x :y])]
     (loop [potential-directions SURROUNDING_DIRECTIONS
-           location (select-keys start [:x :y])
-           dropoff-distance (:dropoff-distance (get-cell world start))
+           start-cell (get-cell world start)
+           dropoff-distance (:next-dropoff-distance start-cell)
            total-cost 0
            directions nil]
-      (if (= location end-location)
+      (if (= (select-keys start-cell [:x :y]) end-location)
         {:directions directions :total-cost total-cost}
         (let [distance-maps (map (fn [direction]
-                                   (let [cell (get-location world location direction)
+                                   (let [cell (get-location world start-cell direction)
                                          distance (distance-between width height cell end-location)]
                                      {:distance distance
                                       :direction direction
                                       :halite (:halite cell)
-                                      :dropoff-distance (:dropoff-distance cell)
-                                      :location (select-keys cell [:x :y])}))
+                                      :next-dropoff-distance (:next-dropoff-distance cell)
+                                      :cell cell}))
                                  potential-directions)
               winner (first (sort (compare-by :distance asc :halite asc) distance-maps))
-              cost-multiplier (if (> (:dropoff-distance winner) dropoff-distance)
+              cost-multiplier (if (> (:next-dropoff-distance winner) dropoff-distance)
                                 2
                                 1)
               potential-directions (remove #(= (:direction winner) (get opposite-direction %))
                                            potential-directions)
-              total-cost (long (+ total-cost (Math/floor (* MOVE_COST cost-multiplier (:halite winner)))))]
+              total-cost (long (+ total-cost (Math/floor (* MOVE_COST cost-multiplier (:halite start-cell)))))]
           (recur potential-directions
-                 (:location winner)
-                 (:dropoff-distance winner)
+                 (:cell winner)
+                 (:next-dropoff-distance winner)
                  total-cost
                  (conj directions (:direction winner))))))))
 
@@ -322,8 +322,7 @@
                                (merge mining-info cell))
                 target (first (sort (compare-by :turns asc :halite-carried desc :dropoff-distance desc)
                                     nearby-cells))
-                mined-this-turn (* GATHER_AMOUNT (+ (:halite current-cell)
-                                                    (get-bonus current-cell)))
+                mined-this-turn (get-gather-amount current-cell)
                 target (if (and target
                                 (>= (:turns target) MAX_TURNS_EVALUATE)
                                 (seq (:top-cells world))
