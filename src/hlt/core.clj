@@ -65,21 +65,21 @@
       48 830
       56 840
       64 850}
-   4 {32 580
-      40 620
-      48 680
-      56 830
-      64 860}})
+   4 {32 333
+      40 360
+      48 500
+      56 667
+      64 667}})
 
 (def DELTA_CARRY 500)
-(def MAX_REWINDS 22)
+(def MAX_REWINDS 14)
 (def NUM_BAN_TURNS 7)
 
 (def get-steal-amount-by-map-size
-  {32 0.4
-   40 0.25
-   48 0.15
-   56 0.05
+  {32 0.0
+   40 0.0
+   48 0.0
+   56 0.0
    64 0.0})
 
 (defn get-steal-amount
