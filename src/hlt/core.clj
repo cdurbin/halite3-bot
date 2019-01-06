@@ -628,7 +628,7 @@
 
         ; cells (filter #(> (:halite %) 150)
         ;               (vals cells))
-        best-cells (if (or ; (two-player? world)
+        best-cells (if (or (two-player? world)
                            (< width 35)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
                            (< turns-left CRASH_TURNS_LEFT))
