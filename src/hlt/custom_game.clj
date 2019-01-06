@@ -14,7 +14,7 @@
   (map #(get (:cells world) %)
        (if (:neighbors location)
          (get-in location [:neighbors 1])
-         (get-in (get-location world location STILL) [:neighbors 1]))))
+         (get-in (get-cell world location) [:neighbors 1]))))
 
 (defn get-two-range-cells
   "Returns cells within two range of my location."
@@ -75,7 +75,7 @@
 (defn get-one-range-ships
   "Returns any ships nearby a location (within one range)."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         nearby-locations (get-in cell [:neighbors 1])]
     (keep (fn [loc]
             (get (:ship-location-map world) loc))
@@ -84,7 +84,7 @@
 (defn get-two-range-ships
   "Returns any ships nearby a location (within two range)."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         nearby-locations (concat (get-in cell [:neighbors 1])
                                  (get-in cell [:neighbors 2]))]
     (keep (fn [loc]
@@ -94,7 +94,7 @@
 (defn get-three-range-ships
   "Returns any ships nearby a location (within three range)."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         nearby-locations (concat (get-in cell [:neighbors 1])
                                  (get-in cell [:neighbors 2])
                                  (get-in cell [:neighbors 3]))]
@@ -105,7 +105,7 @@
 (defn get-four-range-ships
   "Returns any ships nearby a location (within four range)."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         nearby-locations (concat (get-in cell [:neighbors 1])
                                  (get-in cell [:neighbors 2])
                                  (get-in cell [:neighbors 3])
@@ -117,7 +117,7 @@
 (defn get-five-range-ships
   "Returns any ships nearby a location (within four range)."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         nearby-locations (concat (get-in cell [:neighbors 1])
                                  (get-in cell [:neighbors 2])
                                  (get-in cell [:neighbors 3])
@@ -130,7 +130,7 @@
 (defn get-six-range-ships
   "Returns any ships nearby a location (within inspiration range)."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         nearby-locations (concat (get-in cell [:neighbors 1])
                                  (get-in cell [:neighbors 2])
                                  (get-in cell [:neighbors 3])
@@ -144,7 +144,7 @@
 (defn get-seven-range-ships
   "Returns any ships nearby a location (within inspiration range)."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         nearby-locations (concat (get-in cell [:neighbors 1])
                                  (get-in cell [:neighbors 2])
                                  (get-in cell [:neighbors 3])
@@ -236,7 +236,7 @@
   "Returns the number of ships with a different owner within inspiration range."
   [world ship]
   (let [{:keys [ship-location-map]} world
-        cell (get-location world ship STILL)
+        cell (get-cell world ship)
         locations (-> cell :neighbors :inspiration)
         ships (keep ship-location-map locations)]
     (count (filter #(not= (:owner ship) (:owner %)) ships))))
@@ -245,7 +245,7 @@
   "Returns the extra halite a ship would receive if the cell was inspired next round."
   [world ship]
   (let [capacity (get-capacity ship)
-        cell (get-location world ship STILL)
+        cell (get-cell world ship)
         halite-gained-this-turn (* GATHER_AMOUNT (+ (:halite cell) (get-bonus cell)))
         halite-next-round (* CELL_HALITE_LEFT_BEHIND (:halite cell))
         capacity (- capacity halite-gained-this-turn)]
@@ -286,7 +286,7 @@
   [world ship cell]
   ; (if-not (two-player? world)
   ;   0
-  (let [original-cell (get-location world ship STILL)]
+  (let [original-cell (get-cell world ship)]
     (if (= (select-keys original-cell [:x :y]) (select-keys cell [:x :y]))
       0
       (let [cost (- (get-opponent-extra-inspire-by-move world original-cell cell)
@@ -314,7 +314,7 @@
   "Returns true if my target direction is blocked by an enemy ship."
   [world chosen-cell ship]
   (let [my-id (:my-id world)
-        current-cell (get-location world ship STILL)]
+        current-cell (get-cell world ship)]
     (when (or (nil? chosen-cell) (>= (:dropoff-distance chosen-cell) (:dropoff-distance current-cell)))
       (let [cells (get-two-range-cells world current-cell)
             surrounding-ships (filter :ship cells)]
@@ -477,7 +477,7 @@
         bases (conj (:dropoffs my-player) my-shipyard)]
         ; my-ship-ids (map :id (:ships my-player))]
     (reduce (fn [updated-world base]
-              (let [cell (get-location updated-world base STILL)]
+              (let [cell (get-cell updated-world base)]
                 (if (and (:ship cell)
                          (not= (-> cell :ship :owner) my-id))
                   (do (log "I'm ignoring a ship on my base on turn " (:turn updated-world))
@@ -549,7 +549,7 @@
   "Adds a bonus halite to a cell if the cell would be inspired based on the current enemy ship
   locations."
   [world location]
-  (let [cell (get-location world location STILL)
+  (let [cell (get-cell world location)
         inspired? (inspired-cell? world cell)]
     (assoc cell :inspired inspired?)))
 
@@ -565,7 +565,7 @@
 (defn get-locations-in-inspiration-range
   "Returns x and y coords for any location within inspiration range of the current location."
   [world location]
-  (let [cell (get-location world location STILL)]
+  (let [cell (get-cell world location)]
     (conj (-> cell :neighbors :inspiration)
           (select-keys location [:x :y]))))
 

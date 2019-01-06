@@ -20,7 +20,7 @@
 (defn get-cost-to-ram
   "Returns the cost for the ship to ram another one."
   [world ship cell]
-  (let [current-cell (get-location world ship STILL)]
+  (let [current-cell (get-cell world ship)]
     (+
        ; (:halite ship)
        (* MOVE_COST (:halite current-cell))

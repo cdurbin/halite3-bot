@@ -66,7 +66,7 @@
 ;         build-dropoff-distance (if (> num-dropoffs 0)
 ;                                  BUILD_DROPOFF_DISTANCE
 ;                                  FIRST_BUILD_DROPOFF_DISTANCE)
-;         last-dropoff-location (get-location world last-dropoff-location STILL)]
+;         last-dropoff-location (get-cell world last-dropoff-location)]
 ;     (if (and last-dropoff-location
 ;              ; false ;; see what happens if I let my ships build anywhere
 ;              (not (at-enemy-dropoff? world last-dropoff-location))
@@ -114,7 +114,7 @@
   ;       build-dropoff-distance (if (> num-dropoffs 0)
   ;                                BUILD_DROPOFF_DISTANCE
   ;                                FIRST_BUILD_DROPOFF_DISTANCE)
-  ;       last-dropoff-location (get-location world last-dropoff-location STILL)]
+  ;       last-dropoff-location (get-cell world last-dropoff-location)]
   ;   (if (and last-dropoff-location
   ;            ; false ;; see what happens if I let my ships build anywhere
   ;            (not (at-enemy-dropoff? world last-dropoff-location))
@@ -234,13 +234,13 @@
         ships (filter (fn [ship]
                         (or (> (:cell-halite ship) AUTO_BUILD_DROPOFF)
                             (and (or (> (:dropoff-distance ship) FAR_DROPOFF)
-                                     (> (:score (get-location world ship STILL))
+                                     (> (:score (get-cell world ship))
                                         (* MIN_DROPOFF_SCORE 1.5)))
                                  (not-terrible-dropoff? world ship))))
                       ships)
         furthest-ship (first (sort (compare-by :dropoff-distance desc) ships))
         cell (when furthest-ship
-               (get-location world furthest-ship STILL))]
+               (get-cell world furthest-ship))]
     (when (and furthest-ship
                (> (:dropoff-distance furthest-ship) build-dropoff-distance))
                ; (> (:score cell) MIN_DROPOFF_SCORE))
@@ -268,7 +268,7 @@
   (let [{:keys [my-player]} world
         my-ships (:ships my-player)
         potential-ships (filter (fn [ship]
-                                  (let [cell (get-location world ship STILL)]
+                                  (let [cell (get-cell world ship)]
                                     (and (>= (:dropoff-distance ship) USEFUL_DROPOFF_DISTANCE)
                                          (>= (+ (:halite my-player) (:halite ship) (:cell-halite ship))
                                              DROPOFF_COST)
@@ -321,7 +321,7 @@
 (defn good-dropoff?
   "Returns true if a dropoff is good."
   [world dropoff]
-  (let [cell (get-location world dropoff STILL)
+  (let [cell (get-cell world dropoff)
         surrounding-cells (get-three-range-cells world cell)
         nearby-gather (reduce + (map #(+ (:halite %) (get-bonus %)) surrounding-cells))]
     (> nearby-gather GOOD_DROPOFF_GATHER)))

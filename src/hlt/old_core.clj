@@ -70,7 +70,7 @@
 (defn get-cost-to-ram
   "Returns the cost for the ship to ram another one."
   [world ship cell]
-  (let [current-cell (get-location world ship STILL)]
+  (let [current-cell (get-cell world ship)]
     (+
        ; (:halite ship)
        (* MOVE_COST (:halite current-cell))
@@ -388,7 +388,7 @@
         end-location (select-keys end [:x :y])]
     (loop [potential-directions SURROUNDING_DIRECTIONS
            location (select-keys start [:x :y])
-           dropoff-distance (:dropoff-distance (get-location world start STILL))
+           dropoff-distance (:dropoff-distance (get-cell world start))
            total-cost 0
            directions nil]
       (if (= location end-location)
@@ -451,7 +451,7 @@
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
   [world ship]
-  (let [directions (if (= 0 (:dropoff-distance (get-location world ship STILL)))
+  (let [directions (if (= 0 (:dropoff-distance (get-cell world ship)))
                        SURROUNDING_DIRECTIONS
                        ALL_DIRECTIONS)
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) directions)
@@ -477,9 +477,9 @@
              :target (:target ship)
              :direction best-direction
              :reason (str "Moving to target" (dissoc (:target ship) :neighbors))})
-          (let [current-cell (get-location world ship STILL)
+          (let [current-cell (get-cell world ship)
                 nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)
-                                   :let [cell (get-location world location STILL)]
+                                   :let [cell (get-cell world location)]
                                    :when (safe-location? world ship cell)
                                    :let [mining-info (turns-to-full-mining world ship cell)]]
                                (merge mining-info cell))
@@ -557,7 +557,7 @@
                       (assoc best-choice :ship ship))
         banned-cells (when (and blocked? best-choice)
                        (assoc banned-cells
-                              (select-keys (get-location world ship STILL) [:x :y]) NUM_BAN_TURNS))]
+                              (select-keys (get-cell world ship) [:x :y]) NUM_BAN_TURNS))]
         ; best-choice (->> safe-cells
         ;                  (sort (compare-by :dropoff-distance asc :halite asc))
         ;                  first)
@@ -629,7 +629,7 @@
                   colliding-ship (get-colliding-ship world location)
                   ;; Note the colliding ship is not always the cause when forcing to stay still
                   prior-colliding-ship (when colliding-ship
-                                         (get-colliding-ship world (get-location world colliding-ship STILL)))
+                                         (get-colliding-ship world (get-cell world colliding-ship)))
                   _ (when colliding-ship
                       (log "CDD: collision at location " location "calculating move for ship" ship
                            "which decided on direction " direction "causing it to hit" colliding-ship
@@ -694,7 +694,7 @@
         ;; TODO performance improvement
         can-ignore-motivate? (> (/ total-halite total-ship-count) (get-in min-per-spawn-ship
                                                                           [num-players width]))
-        cell (get-location world ship STILL)
+        cell (get-cell world ship)
         last-round-ship (get last-round-ships (:id ship))
         last-mode (:mode last-round-ship)
         mode (if (and (= :dropoff last-mode)
@@ -728,7 +728,7 @@
     (log "Predict ships with other-ships" other-ships) ; "and other dropoffs" other-dropoffs)
     (reduce (fn [updated-world ship]
               ; (log "Reduce called with ship" ship " and Updated world " updated-world)
-              (let [cell (get-location updated-world ship STILL)
+              (let [cell (get-cell updated-world ship)
                     updated-world (assoc-in updated-world
                                             [:cells (select-keys cell [:x :y]) :ship] ship)
                     surrounding-cells (when (or (little-halite-left? world MIN_CRASH_FOR_HALITE)
@@ -784,8 +784,8 @@
                                            (or (= target-location ship-location)
                                                (get ship-location-map target-location)
                                                (<= (distance-between width height ship-location target-location) 15)
-                                               (better-cell? (get-location world ship STILL)
-                                                             (get-location world (:target ship) STILL))
+                                               (better-cell? (get-cell world ship)
+                                                             (get-cell world (:target ship)))
                                                (some (set [(select-keys ship [:x :y])])
                                                      top-cell-locations))))
                                        ships-with-targets)]
@@ -840,7 +840,7 @@
                                                     (and ship
                                                          ; (not= GHOST (:id ship))
                                                          (not= my-id (:owner ship))))
-                                                 (get-two-range-cells world (get-location world location STILL))))))]
+                                                 (get-two-range-cells world (get-cell world location))))))]
             [location turns]))))
 
 (defn -main
@@ -936,7 +936,7 @@
                                                    (mapcat #(get-locations-in-inspiration-range world %)
                                                            potential-locations)))
             ; _ (log "Locations that could have a different score are:" (pprint/pprint score-potential-locations logger))
-            score-potential-cells (map #(get-location world % STILL) score-potential-locations)
+            score-potential-cells (map #(get-cell world %) score-potential-locations)
             updated-cell-map (decorate-cells world
                                              score-potential-cells
                                              (conj (:dropoffs my-player) my-shipyard))
@@ -996,7 +996,7 @@
                          :min-uninspired-score min-uninspired-score)
             build-dropoff-distance (get-dropoff-distance (count (:dropoffs my-player)))
             dropoff-location (when (and last-dropoff-location
-                                        (>= (:dropoff-distance (get-location world last-dropoff-location STILL))
+                                        (>= (:dropoff-distance (get-cell world last-dropoff-location))
                                             build-dropoff-distance))
                                last-dropoff-location)
             dropoff-locations (choose-dropoff-locations world dropoff-location)
@@ -1054,7 +1054,7 @@
             ; other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
             ; other-ships (map (fn [ship]
             ;                    (assoc ship :mode (get-mode ship
-            ;                                                (get-location world ship STILL)
+            ;                                                (get-cell world ship)
             ;                                                (:turns-left world))))
             ;                  other-ships)
             ; collecting-ships (sort (compare-by :cell-halite desc)
