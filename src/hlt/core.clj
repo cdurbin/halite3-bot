@@ -47,6 +47,18 @@
       56 14
       64 16}})
 
+; (def halite-burn-map
+;   {2 {32 28
+;       40 28
+;       48 28
+;       56 28
+;       64 28}
+;    4 {32 28
+;       40 28
+;       48 28
+;       56 28
+;       64 28}})
+
 ; (def min-per-spawn-ship
 ;   {2 {32 810
 ;       40 820
@@ -65,11 +77,11 @@
       48 830
       56 840
       64 850}
-   4 {32 333
+   4 {32 350
       40 390
       48 500
       56 667
-      64 667}})
+      64 750}})
 
 (def DELTA_CARRY 500)
 (def MAX_REWINDS 14)
@@ -124,9 +136,12 @@
              cell (get-in world [:cells (select-keys ship [:x :y])])
              my-ship-count (count (:ships my-player))
              halite-burn (get-in halite-burn-map [num-players width])
-             halite-burn (if (little-halite-left? world MIN_CRASH_FOR_HALITE)
-                           4
+             halite-burn (if (= :dropoff (:mode ship))
+                           24
                            halite-burn)]
+             ; halite-burn (if (little-halite-left? world MIN_CRASH_FOR_HALITE)
+             ;               4
+             ;               halite-burn)]
              ; halite-burn (if (= :collect (:mode ship))
              ;               MAX_HALITE_BURN_COLLECT
              ;               MAX_HALITE_BURN_DROPOFF)]
@@ -222,31 +237,31 @@
   (let [{:keys [width height]} world
         end-location (select-keys end [:x :y])]
     (loop [potential-directions SURROUNDING_DIRECTIONS
-           location (select-keys start [:x :y])
-           dropoff-distance (:dropoff-distance (get-cell world start))
+           start-cell (get-cell world start)
+           dropoff-distance (:next-dropoff-distance start-cell)
            total-cost 0
            directions nil]
-      (if (= location end-location)
+      (if (= (select-keys start-cell [:x :y]) end-location)
         {:directions directions :total-cost total-cost}
         (let [distance-maps (map (fn [direction]
-                                   (let [cell (get-location world location direction)
+                                   (let [cell (get-location world start-cell direction)
                                          distance (distance-between width height cell end-location)]
                                      {:distance distance
                                       :direction direction
                                       :halite (:halite cell)
-                                      :dropoff-distance (:dropoff-distance cell)
-                                      :location (select-keys cell [:x :y])}))
+                                      :next-dropoff-distance (:next-dropoff-distance cell)
+                                      :cell cell}))
                                  potential-directions)
               winner (first (sort (compare-by :distance asc :halite asc) distance-maps))
-              cost-multiplier (if (> (:dropoff-distance winner) dropoff-distance)
-                                2
+              cost-multiplier (if (> (:next-dropoff-distance winner) dropoff-distance)
+                                1
                                 1)
               potential-directions (remove #(= (:direction winner) (get opposite-direction %))
                                            potential-directions)
-              total-cost (long (+ total-cost (Math/floor (* MOVE_COST cost-multiplier (:halite winner)))))]
+              total-cost (long (+ total-cost (Math/floor (* MOVE_COST cost-multiplier (:halite start-cell)))))]
           (recur potential-directions
-                 (:location winner)
-                 (:dropoff-distance winner)
+                 (:cell winner)
+                 (:next-dropoff-distance winner)
                  total-cost
                  (conj directions (:direction winner))))))))
 
@@ -320,7 +335,9 @@
                          (filter #(safe-ignoring-ghost-ships? world ship %) surrounding-cells)
                          safe-cells)]
         (if (:target ship)
-          (let [best-direction (get-best-direction world ship (:target ship) safe-cells)
+          (let [
+                ; safe-cells (remove #(= STILL (:direction %)) safe-cells)
+                best-direction (get-best-direction world ship (:target ship) safe-cells)
                 best-direction (or best-direction STILL)]
             (log "Target is " (select-keys (:target ship) [:x :y]) "and best direction" best-direction)
             (flog world (:target ship) (format "Ship %d existing target" (:id ship)) :orange)
@@ -336,8 +353,9 @@
                                (merge mining-info cell))
                 target (first (sort (compare-by :turns asc :halite-carried desc :dropoff-distance desc)
                                     nearby-cells))
-                mined-this-turn (* GATHER_AMOUNT (+ (:halite current-cell)
-                                                    (get-bonus current-cell)))
+                mined-this-turn (Math/ceil
+                                  (* GATHER_AMOUNT (+ (:halite current-cell)
+                                                      (get-bonus current-cell))))
                 target (if (and target
                                 (>= (:turns target) MAX_TURNS_EVALUATE)
                                 (seq (:top-cells world))
@@ -672,7 +690,7 @@
                                                target-location (select-keys (:target ship) [:x :y])]
                                            (or (= target-location ship-location)
                                                (get ship-location-map target-location)
-                                               (<= (distance-between width height ship-location target-location) 7)
+                                               (<= (distance-between width height ship-location target-location) 15)
                                                (better-cell? (get-cell world ship)
                                                              (get-cell world (:target ship)))
                                                (some (set [(select-keys ship [:x :y])])
@@ -976,6 +994,7 @@
                                          dropoff-location)
             other-ships (get-my-ships-that-can-move stuck-ships my-player)
             other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
+            ; collecting-ships (sort (compare-by :dropoff-distance desc :halite desc :cell-halite desc)
             collecting-ships (sort (compare-by :cell-halite desc :halite desc :dropoff-distance desc)
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
