@@ -33,7 +33,7 @@
 
 (def LAST_TURN_DROPOFF_PCT 0.80)
 (def MIN_SHIPS_BEFORE_IGNORE_GHOST 45)
-(def MAX_TURNS_EVALUATE 5)
+(def MAX_TURNS_EVALUATE 6)
 
 (def halite-burn-map
   {2 {32 16
@@ -145,8 +145,7 @@
   [world ship]
   (let [{:keys [width height top-cells uninspired-cells dropoff-locations move-towards-dropoff?
                 good-dropoffs]} world
-        cells
-              (if (and (seq dropoff-locations)
+        cells (if (and (seq dropoff-locations)
                        move-towards-dropoff?
                        (<= (apply min (map #(distance-between width height ship %) dropoff-locations))
                            FLOW_DISTANCE))
@@ -315,7 +314,10 @@
              :direction best-direction
              :reason (str "Moving to target" (select-keys (:target ship) [:x :y :halite]))})
           (let [current-cell (get-cell world ship)
-                nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)
+                ; nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)])
+                nearby-cells (for [location (concat (-> current-cell :neighbors :inspiration)
+                                                    (get-in current-cell [:neighbors 5])
+                                                    [current-cell])
                                    :let [cell (get-cell world location)]
                                    :when (should-mine-cell? world ship cell location)
                                    :let [mining-info (turns-to-full-mining world ship cell)]]
@@ -356,15 +358,22 @@
                       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
                       (assoc ram-cell :ship ship :reason "Ramming ship."))
                   (let [target (get-top-cell-target world ship)
-                        ; safe-cells (remove #(= STILL (:direction %)) safe-cells)
-                        best-direction (get-best-gather-direction world ship target safe-cells)
-                        best-direction (or best-direction STILL)]
-                    (log "Target is " target "and best direction" best-direction)
-                    (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
-                    {:ship (assoc ship :target target)
-                     :target target
-                     :direction best-direction
-                     :reason (str "There were no good targets so I picked" (select-keys target [:x :y :halite]))})))))))))
+                        mined (if (nil? (:halite target))
+                                INFINITY
+                                (get-gather-amount target))]
+                    (if (and target (>= mined mined-this-turn))
+                      (let [; safe-cells (remove #(= STILL (:direction %)) safe-cells)
+                            best-direction (get-best-gather-direction world ship target safe-cells)
+                            best-direction (or best-direction STILL)]
+                        (log "Target is " target "and best direction" best-direction)
+                        (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
+                        {:ship (assoc ship :target target)
+                         :target target
+                         :direction best-direction
+                         :reason (str "There were no good targets so I picked" (select-keys target [:x :y :halite]))})
+                      {:ship ship
+                       :direction STILL
+                       :reason (str "Supposed to go to " (select-keys target [:x :y]) "but that's worse than my current cell.")}))))))))))
 
 (defn get-dropoff-move
   "Returns a move towards a dropoff site."
