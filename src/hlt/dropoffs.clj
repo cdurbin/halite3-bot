@@ -12,7 +12,7 @@
 (def MAX_DROPOFF_LOCATION_DISTANCE 40)
 (def NUM_POTENTIAL_DROPOFFS 1)
 ; (def MIN_DROPOFF_SCORE 6500)
-(def MIN_DROPOFF_SCORE 5000)
+(def MIN_DROPOFF_SCORE 5100)
 
 (def MIN_SHIPS_PER_DROPOFF 13)
 (def MIN_SHIPS_FOR_FIRST_DROPOFF 15)
@@ -54,8 +54,8 @@
         my-ships (filter #(= my-id (:owner %)) nearby-ships)
         my-ship-count (count my-ships)
         other-ship-count (- (count nearby-ships) (count my-ships))]
-    (or (> my-ship-count 5)
-        (<= (- other-ship-count my-ship-count) 3))))
+    ; (or (> my-ship-count 7)
+    (>= my-ship-count other-ship-count)))
 
 ; (defn choose-dropoff-locations
 ;   "Given a bunch of choices for dropoff locations. Choose the one(s) that could be the most
@@ -273,6 +273,7 @@
                                          (>= (+ (:halite my-player) (:halite ship) (:cell-halite ship))
                                              DROPOFF_COST)
                                          (not (at-enemy-dropoff? world ship))
+                                         (not-terrible-dropoff? world cell)
                                          (enough-nearby-ship-halite world cell)
                                          (enough-nearby-gather-halite world cell))))
                                 my-ships)]

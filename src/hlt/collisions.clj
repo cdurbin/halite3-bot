@@ -6,7 +6,7 @@
    [hlt.custom-game :refer :all]))
 
 ;; TODO Get these parameters back in the main code
-(def MIN_CRASH_FOR_HALITE 350)
+(def MIN_CRASH_FOR_HALITE 330)
 (def CRASH_TURNS_LEFT 25)
 (def FOUR_PLAYER_HALITE_TO_CRASH 250)
 (def TURNS_TO_START_CRASHING 8)

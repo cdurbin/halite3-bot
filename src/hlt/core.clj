@@ -33,7 +33,7 @@
 
 (def LAST_TURN_DROPOFF_PCT 0.80)
 (def MIN_SHIPS_BEFORE_IGNORE_GHOST 45)
-(def MAX_TURNS_EVALUATE 6)
+(def MAX_TURNS_EVALUATE 5)
 
 (def halite-burn-map
   {2 {32 16
@@ -41,7 +41,7 @@
       48 12
       56 8
       64 8}
-   4 {32 12
+   4 {32 15
       40 12
       48 14
       56 14
@@ -316,7 +316,7 @@
           (let [current-cell (get-cell world ship)
                 ; nearby-cells (for [location (conj (-> current-cell :neighbors :inspiration) current-cell)])
                 nearby-cells (for [location (concat (-> current-cell :neighbors :inspiration)
-                                                    (get-in current-cell [:neighbors 5])
+                                                    ; (get-in current-cell [:neighbors 5])
                                                     [current-cell])
                                    :let [cell (get-cell world location)]
                                    :when (should-mine-cell? world ship cell location)
