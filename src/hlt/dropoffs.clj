@@ -11,11 +11,11 @@
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 40)
 ; (def NUM_POTENTIAL_DROPOFFS 1)
-; (def MIN_DROPOFF_SCORE 6500)
-(def MIN_DROPOFF_SCORE 5100)
+(def MIN_DROPOFF_SCORE 6500)
+; (def MIN_DROPOFF_SCORE 5100)
 
 (def MIN_SHIPS_PER_DROPOFF 13)
-(def MIN_SHIPS_FOR_FIRST_DROPOFF 12)
+(def MIN_SHIPS_FOR_FIRST_DROPOFF 14)
 (def MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER 15)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
 
@@ -29,16 +29,26 @@
 (def USEFUL_DROPOFF_DISTANCE 16)
 
 (def min-per-ship-to-build-dropoff
-  {2 {32 1410
-      40 1410
-      48 1410
-      56 1110
-      64 1110}
-   4 {32 380
-      40 380
-      48 350
-      56 330
-      64 350}})
+  {2 {32 5
+      40 5
+      48 5
+      56 5
+      64 5}
+   4 {32 5
+      40 5
+      48 5
+      56 5
+      64 5}})
+  ; {2 {32 1410
+  ;     40 1410
+  ;     48 1410
+  ;     56 1110
+  ;     64 1110}
+  ;  4 {32 380
+  ;     40 380
+  ;     48 350
+  ;     56 330
+  ;     64 350}})
 
 (defn get-dropoff-distance
   "Returns the number of cells between dropoffs to decide what to build."

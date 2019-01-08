@@ -8,6 +8,8 @@ Starter bot for Halite 3 written in Clojure
 
 * Figure out number of turns before I could possibly build a dropoff.
   - Amount I save is the amount I need subtracting any halite in nearby ships dropping off (closer than the number of turns before I build a dropoff + 1000 (since I'll be building a ship this turn.)
+* Commit to a single dropoff sooner. Based on how good that dropoff might be choose more or fewer ships required.
+* Figure out big time collisions with tons of ships.
 
 ### 12/10
 
