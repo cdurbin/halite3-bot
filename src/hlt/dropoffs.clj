@@ -15,7 +15,8 @@
 (def MIN_DROPOFF_SCORE 5100)
 
 (def MIN_SHIPS_PER_DROPOFF 13)
-(def MIN_SHIPS_FOR_FIRST_DROPOFF 15)
+(def MIN_SHIPS_FOR_FIRST_DROPOFF 12)
+(def MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER 14)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
 
 (def FAR_DROPOFF 25)
@@ -105,6 +106,24 @@
 ;         (when (and ship (< distance MAX_MOVE_TO_DROPOFF_DISTANCE))
 ;           [dropoff])))))
 
+(defn custom-dropoff-score
+  "Scores a dropoff. Takes the score, uninspired-score, dropoff distance,
+  number of my nearby ships into account."
+  [world dropoff]
+  (let [{:keys [score uninspired-score dropoff-distance]} dropoff
+        my-id (:my-id world)
+        nearby-ships (get-six-range-ships world dropoff)
+        my-nearby-count (count (filter #(= my-id (:owner %)) nearby-ships))]
+    (+ (* 0.25 score) (* 0.75 uninspired-score) (* 250 my-nearby-count)
+       (- (* 100 dropoff-distance)))))
+
+(defn choose-best-dropoffs
+  "Returns the best dropoff from a list of dropoff locations."
+  [world dropoffs]
+  (let [dropoffs-with-scores (map #(assoc % :custom-score (custom-dropoff-score world %))
+                                  dropoffs)]
+    (take 5 (sort (compare-by :custom-score desc) dropoffs-with-scores))))
+
 (defn choose-dropoff-locations
   "Given a bunch of choices for dropoff locations. Choose the one(s) that could be the most
   valuable."
@@ -145,7 +164,8 @@
                                      (>= (:uninspired-score %) MIN_DROPOFF_SCORE)
                                      (not-terrible-dropoff? world %))
                                uninspired-cells))]
-    nearby-sites))
+    (when (seq nearby-sites)
+      (choose-best-dropoffs world nearby-sites))))
     ;     - (log (format "Turn %d potential dropoff locations %s" (:turn world)
     ;                  ; (pr-str (take NUM_POTENTIAL_DROPOFFS (map #(select-keys % [:x :y]) (sort (compare-by :score desc) nearby-sites))))
     ;                    (pr-str (take NUM_POTENTIAL_DROPOFFS (map #(select-keys % [:x :y]) (sort (compare-by :uninspired-score desc) nearby-sites))))))
@@ -168,7 +188,10 @@
                                         players))
         total-ship-count (inc total-ship-count)
         my-ship-count (count (:ships my-player))
-        my-num-dropoffs (inc (count (:dropoffs my-player)))]
+        my-num-dropoffs (inc (count (:dropoffs my-player)))
+        first-dropoff-ships (if (two-player? world)
+                              MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER
+                              MIN_SHIPS_FOR_FIRST_DROPOFF)]
     (log "Total halite:" total-halite "total-ship-count" total-ship-count)
     (log "Calculation of halite per ship:" (int (/ total-halite total-ship-count)))
     (log "Turn is " turn "last dropoff-turn is" last-dropoff-turn)
@@ -176,7 +199,7 @@
           (if last-dropoff-location
             (< turn (+ 10 last-dropoff-turn))
             (< turn last-dropoff-turn))
-          (> my-ship-count (+ MIN_SHIPS_FOR_FIRST_DROPOFF
+          (> my-ship-count (+ first-dropoff-ships
                               (* MIN_SHIPS_PER_DROPOFF (dec my-num-dropoffs))))
           (or (seq dropoff-locations)
               (> (/ total-halite total-ship-count) (get-in min-per-ship-to-build-dropoff [num-players width]))))))
@@ -333,3 +356,28 @@
   nil
   (let [my-dropoffs (-> world :my-player :dropoffs)]
     (filter #(good-dropoff? world %) my-dropoffs)))
+
+(defn get-dropoff-advance-ships
+  "Returns ships that are dropping off, but don't have to move back to an existing base in order
+  to have enough halite to build a new dropoff."
+  [world dropoff-ships]
+  (let [{:keys [my-player dropoff-locations]} world
+        halite-required (- DROPOFF_COST
+                           (apply min 1000 (map :halite dropoff-locations))
+                           (apply min 1000 (map :halite dropoff-ships)))]
+    (if (>= (:halite my-player) halite-required)
+      dropoff-ships
+      (let [sorted-ships (sort (compare-by :dropoff-distance asc :halite desc) dropoff-ships)]
+        (loop [remaining-ships sorted-ships
+               halite (:halite my-player)]
+          (when-let [next-ship (first remaining-ships)]
+            (let [halite (+ halite (- (:halite next-ship) 80))]
+              (if (>= halite halite-required)
+                (rest remaining-ships)
+                (recur (rest remaining-ships) halite)))))))))
+
+(defn decorate-advance-dropoff-ships
+  "Adds a key to indicate this is an advance dropoff ship."
+  [advance-dropoff-ship dropoff-ships]
+  (conj (remove-item advance-dropoff-ship dropoff-ships)
+        (assoc advance-dropoff-ship :advance true)))

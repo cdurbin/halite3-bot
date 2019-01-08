@@ -2,6 +2,6 @@
 
 rm *.log
 #./halite --replay-directory replays/ -vvv --width 32 --height 32 "python3 ../Python/MyBot.py" "java -jar target/uberjar/MyBot.jar"
-./halite --replay-directory replays/ -vvv --width 64 --height 64 "java -jar jars/V162.jar" "java -jar jars/V170.jar" "java -jar jars/V159.jar" "java -jar target/uberjar/MyBot.jar -log"
+./halite --replay-directory replays/ -vvv --width 64 --height 64 "java -jar jars/V162.jar" "java -jar jars/V170.jar" "java -jar jars/V180.jar" "java -jar target/uberjar/MyBot.jar -log"
 rm replays/*.log
 mv flog* replays

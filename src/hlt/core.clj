@@ -378,7 +378,10 @@
 (defn get-dropoff-move
   "Returns a move towards a dropoff site."
   [world ship]
-  (let [banned-cells (:banned-cells world)
+  (let [the-key (if (:advance ship)
+                  :next-dropoff-distance
+                  :dropoff-distance)
+        banned-cells (:banned-cells world)
         surrounding-cells (for [direction SURROUNDING_DIRECTIONS]
                             (assoc (get-location world ship direction) :direction direction))
         surrounding-cells (conj surrounding-cells (assoc (get-cell world ship) :direction STILL))
@@ -396,8 +399,8 @@
            best-choice (->> safe-cells
                             (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
                                                     (get-inspire-delta-by-move world ship %)
-                                                    (- (* 2000 (/ 1 (+ 0.5 (:next-dropoff-distance %))))))))
-                            (sort (compare-by :cost asc :next-dropoff-distance asc))
+                                                    (- (* 2000 (/ 1 (+ 0.5 (the-key %))))))))
+                            (sort (compare-by :cost asc the-key asc))
                             ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
                             first)
            ; safe-cells (if (and (> (:my-ship-count world) MIN_SHIPS_BEFORE_IGNORE_GHOST)
@@ -411,8 +414,8 @@
                          (->> safe-cells
                               (map #(assoc % :cost (+ (* 0.1 MOVE_COST (:halite %))
                                                       (get-inspire-delta-by-move world ship %)
-                                                      (- (* 2000 (/ 1 (+ 0.5 (:next-dropoff-distance %))))))))
-                              (sort (compare-by :cost asc :next-dropoff-distance asc))
+                                                      (- (* 2000 (/ 1 (+ 0.5 (get % the-key))))))))
+                              (sort (compare-by :cost asc the-key asc))
                               ; (sort (compare-by :cost asc :dropoff-distance asc :halite asc))
                               first)
                          best-choice)
@@ -825,12 +828,6 @@
     (flog world ship (str "Dropoff score:" total))
     total))
 
-
-
-        ;; Don't think this one makes sense to add (at least yet)
-        ;; target-score (score-moving-toward-target world ship cell)]))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; The main loop
 (defn -main
@@ -874,10 +871,10 @@
                                  (apply max (map :halite last-dropoff-locations))
                                  500)
             move-towards-dropoff? (and (seq last-dropoff-locations)
-                                       build-dropoff?
-                                       (or (> (count (:ships my-player)) 25)
-                                           (> (:halite my-player)
-                                              (- DROPOFF_COST max-halite-dropoff))))
+                                       build-dropoff?)
+                                       ; (or (> (count (:ships my-player)) 25)
+                                       ;     (> (:halite my-player)
+                                       ;        (- DROPOFF_COST max-halite-dropoff))))
             updated-cell-map (decorate-cells world
                                              score-potential-cells
                                              (conj (:dropoffs my-player) my-shipyard)
@@ -974,6 +971,13 @@
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))
+            dropoff-advance-ships (get-dropoff-advance-ships world dropoff-ships)
+            _ (doseq [s dropoff-advance-ships]
+                (flog-color world s "ADVANCE" :yellow))
+            dropoff-ships (reduce (fn [ships next-advance-ship]
+                                    (decorate-advance-dropoff-ships next-advance-ship ships))
+                                  dropoff-ships
+                                  dropoff-advance-ships)
             {:keys [world moves]} (get-moves-and-world world (concat stuck-ships
                                                                      dropoff-ships
                                                                      collecting-ships))
