@@ -837,7 +837,7 @@
   (let [world (load-world)
         {:keys [my-shipyard cells width height num-players my-id other-shipyards]} world
         cells (map #(add-neighbors world %) (vals cells))
-        cells (decorate-cells world cells [my-shipyard] nil)
+        cells (doall (decorate-cells world cells [my-shipyard] nil))
         last-turn (total-turns height width)
         last-spawn-turn (* last-turn (get last-spawn-turn-pct num-players))
         last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
@@ -939,15 +939,13 @@
             world (remove-bad-targets world last-dropoff-location)
             my-player (:my-player world)
             ; build-dropoff? (should-build-dropoff? world last-dropoff-location)
-            halite-to-save (if build-dropoff?
-                             (- DROPOFF_COST (apply max 500 (map :halite dropoff-locations)))
+            halite-to-save (if (and build-dropoff? (seq dropoff-locations))
+                             (- DROPOFF_COST (apply max (map :halite dropoff-locations)))
                              0)
             world (assoc world
                          :reserve halite-to-save
                          :move-towards-dropoff? (and move-towards-dropoff? build-dropoff?))
-
             try-to-spawn? (want-to-spawn? world)
-
             banned-cells (remove-one-turn-from-banned-cells world banned-cells)
             _ (doseq [cell (keys banned-cells)]
                 (flog world cell "Banned cell" :green))

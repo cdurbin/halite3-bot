@@ -4,6 +4,11 @@ Starter bot for Halite 3 written in Clojure
 
 ## TODO
 
+### 1/8
+
+* Figure out number of turns before I could possibly build a dropoff.
+  - Amount I save is the amount I need subtracting any halite in nearby ships dropping off (closer than the number of turns before I build a dropoff + 1000 (since I'll be building a ship this turn.)
+
 ### 12/10
 
 * [ ] Fix end game return (leaving too many turtles behind)

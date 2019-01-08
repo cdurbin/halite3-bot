@@ -10,13 +10,13 @@
 (def FIRST_BUILD_DROPOFF_DISTANCE 15)
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 40)
-(def NUM_POTENTIAL_DROPOFFS 1)
+; (def NUM_POTENTIAL_DROPOFFS 1)
 ; (def MIN_DROPOFF_SCORE 6500)
 (def MIN_DROPOFF_SCORE 5100)
 
 (def MIN_SHIPS_PER_DROPOFF 13)
 (def MIN_SHIPS_FOR_FIRST_DROPOFF 12)
-(def MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER 14)
+(def MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER 15)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
 
 (def FAR_DROPOFF 25)
@@ -117,12 +117,14 @@
     (+ (* 0.25 score) (* 0.75 uninspired-score) (* 250 my-nearby-count)
        (- (* 100 dropoff-distance)))))
 
+(def NUM_POTENTIAL_DROPOFFS 7)
+
 (defn choose-best-dropoffs
   "Returns the best dropoff from a list of dropoff locations."
   [world dropoffs]
   (let [dropoffs-with-scores (map #(assoc % :custom-score (custom-dropoff-score world %))
                                   dropoffs)]
-    (take 5 (sort (compare-by :custom-score desc) dropoffs-with-scores))))
+    (take NUM_POTENTIAL_DROPOFFS (sort (compare-by :custom-score desc) dropoffs-with-scores))))
 
 (defn choose-dropoff-locations
   "Given a bunch of choices for dropoff locations. Choose the one(s) that could be the most
