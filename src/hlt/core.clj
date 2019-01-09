@@ -838,14 +838,19 @@
         cells (map #(add-neighbors world %) (vals cells))
         cells (doall (decorate-cells world cells [my-shipyard] nil))
         ; cells (decorate-cells world cells [my-shipyard] nil)
-        _ (log "Cells" cells)
+        ; _ (log "Cells" cells)
         ; _ (System/exit 1)
         last-turn (total-turns height width)
         last-spawn-turn (* last-turn (get last-spawn-turn-pct num-players))
         last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
         world (assoc world
+                     :cells cells
                      :last-turn last-turn :last-spawn-turn last-spawn-turn
-                     :last-dropoff-turn last-dropoff-turn)]
+                     :last-dropoff-turn last-dropoff-turn)
+        ;; Do some extra stuff to try to prevent unknown timeout issue in turn 3.
+        [top-cells uninspired-cells] (get-top-cells world PERCENT_TOP_CELLS)
+        inspire-update-cells (map #(inspire-cell world %) (vals cells))
+        cells (combine-cells inspire-update-cells cells)]
     (println bot-name)
     (loop [cells cells
            last-round-ships nil
@@ -858,12 +863,12 @@
             {:keys [ship-location-map potential-locations updated-cells my-player turns-left
                     players turn cells other-players
                     potential-locations other-player-ships]} world
-            score-potential-locations (set (mapcat #(get-locations-in-inspiration-range world %)
-                                                   potential-locations))
+            ; score-potential-locations (set (mapcat #(get-locations-in-inspiration-range world %)
+            ;                                        potential-locations))
             ;                                        updated-cells))
-            ; score-potential-locations (set (concat score-potential-locations
-            ;                                        (mapcat #(get-locations-in-inspiration-range world %)
-            ;                                                potential-locations)))
+            score-potential-locations (set (concat potential-locations
+                                                   (mapcat #(get-locations-in-inspiration-range world %)
+                                                           potential-locations)))
             ;; ## IMPORTANT - must be done prior to scoring cells
             world (if (> (:turns-left world) TURNS_TO_START_CRASHING)
                     (predict-enemy-ship-locations world ship-location-map)
