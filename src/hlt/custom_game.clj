@@ -7,6 +7,8 @@
    [hlt.game :refer :all])
   (:gen-class))
 
+(set! *warn-on-reflection* true)
+
 (def GHOST "ghost")
 
 (defn get-surrounding-cells

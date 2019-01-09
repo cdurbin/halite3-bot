@@ -6,6 +6,8 @@
    [hlt.custom-game :refer :all])
   (:gen-class))
 
+(set! *warn-on-reflection* true)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Dropoff management
 (def FIRST_BUILD_DROPOFF_DISTANCE 15)

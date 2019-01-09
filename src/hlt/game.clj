@@ -6,6 +6,8 @@
    [hlt.utils :refer :all])
   (:gen-class))
 
+(set! *warn-on-reflection* true)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Constants
 (def NORTH "n")

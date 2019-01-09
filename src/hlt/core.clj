@@ -626,6 +626,7 @@
   (let [{:keys [cells width height ship-location-map my-id turns-left]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
+        ; avg-score (/ (reduce + (map :score cells)) (* width height))
         cells (remove #(when-let [ship (get ship-location-map (select-keys % [:x :y]))]
                          (not= my-id (:owner ship)))
                             ; (< (:halite %) 1000))
@@ -640,7 +641,7 @@
         ; cells (filter #(> (:halite %) 150)
         ;               (vals cells))
         best-cells (if (or (two-player? world)
-                           (< width 35)
+                           (< width 43)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
                            (< turns-left CRASH_TURNS_LEFT))
                      cells
@@ -648,7 +649,7 @@
                                (let [nearby-ships (get-five-range-ships world cell)]
                                  (when (< (count nearby-ships) 6)
                                    cell)))
-                             cells))]
+                             (take (* 3 num-cells-to-return) cells)))]
     [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
                                                                       best-cells)))
      (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))]))
@@ -847,14 +848,14 @@
                      :cells cells
                      :last-turn last-turn :last-spawn-turn last-spawn-turn
                      :last-dropoff-turn last-dropoff-turn)
-        total-halite (reduce + (map :halite (vals cells)))
-        world (assoc world
-                     :total-halite total-halite :total-other-ship-halite 1
-                     :total-ship-count 1 :turns-left 400)
+        total-halite (reduce + (map :halite (vals cells)))]
         ;; Do some extra stuff to try to prevent unknown timeout issue in turn 3.
-        [top-cells uninspired-cells] (get-top-cells world PERCENT_TOP_CELLS)
-        inspire-update-cells (map #(inspire-cell world %) (vals cells))
-        cells (combine-cells inspire-update-cells cells)]
+        ; world (assoc world
+        ;              :total-halite total-halite :total-other-ship-halite 1
+        ;              :total-ship-count 1 :turns-left 400)
+        ; [top-cells uninspired-cells] (get-top-cells world PERCENT_TOP_CELLS)
+        ; inspire-update-cells (map #(inspire-cell world %) (vals cells))
+        ; cells (combine-cells inspire-update-cells cells)]
     ; (Thread/sleep 10000)
     (println bot-name)
     (loop [cells cells

@@ -6,6 +6,8 @@
    [hlt.custom-game :refer :all])
   (:gen-class))
 
+(set! *warn-on-reflection* true)
+
 ;; TODO Get these parameters back in the main code
 (def MIN_CRASH_FOR_HALITE 330)
 (def CRASH_TURNS_LEFT 25)
@@ -261,7 +263,7 @@
           (recur remaining-halite
                  (inc iteration)
                  total-halite
-                 delta-carry
+                 (long delta-carry)
                  (get-ships-in-cells world (get-in cell [:neighbors (inc iteration)]))))))))
 
 (defn spoils-of-war

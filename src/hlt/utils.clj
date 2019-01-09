@@ -8,7 +8,7 @@
    [cheshire.core :as json])
   (:gen-class))
 
-(def bot-name "Durbinator-v187")
+(def bot-name "Durbinator-v188")
 
 (def INFINITY 999999)
 
