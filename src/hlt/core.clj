@@ -847,10 +847,15 @@
                      :cells cells
                      :last-turn last-turn :last-spawn-turn last-spawn-turn
                      :last-dropoff-turn last-dropoff-turn)
+        total-halite (reduce + (map :halite (vals cells)))
+        world (assoc world
+                     :total-halite total-halite :total-other-ship-halite 1
+                     :total-ship-count 1 :turns-left 400)
         ;; Do some extra stuff to try to prevent unknown timeout issue in turn 3.
         [top-cells uninspired-cells] (get-top-cells world PERCENT_TOP_CELLS)
         inspire-update-cells (map #(inspire-cell world %) (vals cells))
         cells (combine-cells inspire-update-cells cells)]
+
     (println bot-name)
     (loop [cells cells
            last-round-ships nil
