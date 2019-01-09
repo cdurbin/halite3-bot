@@ -5,9 +5,10 @@
    [clj-time.format :as time-format]
    [clj-time.local :as local]
    [clojure.java.io :as clj-io]
-   [cheshire.core :as json]))
+   [cheshire.core :as json])
+  (:gen-class))
 
-(def bot-name "Durbinator-v186")
+(def bot-name "Durbinator-v187")
 
 (def INFINITY 999999)
 

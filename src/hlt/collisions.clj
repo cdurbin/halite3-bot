@@ -3,7 +3,8 @@
   (:require
    [hlt.utils :refer :all]
    [hlt.game :refer :all]
-   [hlt.custom-game :refer :all]))
+   [hlt.custom-game :refer :all])
+  (:gen-class))
 
 ;; TODO Get these parameters back in the main code
 (def MIN_CRASH_FOR_HALITE 330)

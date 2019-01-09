@@ -855,7 +855,7 @@
         [top-cells uninspired-cells] (get-top-cells world PERCENT_TOP_CELLS)
         inspire-update-cells (map #(inspire-cell world %) (vals cells))
         cells (combine-cells inspire-update-cells cells)]
-
+    ; (Thread/sleep 10000)
     (println bot-name)
     (loop [cells cells
            last-round-ships nil
@@ -868,6 +868,7 @@
             {:keys [ship-location-map potential-locations updated-cells my-player turns-left
                     players turn cells other-players
                     potential-locations other-player-ships]} world
+            ; _ (when (> turn 3) (println "dead"))
             ; score-potential-locations (set (mapcat #(get-locations-in-inspiration-range world %)
             ;                                        potential-locations))
             ;                                        updated-cells))
@@ -952,8 +953,9 @@
             world (remove-bad-targets world last-dropoff-location)
             my-player (:my-player world)
             ; build-dropoff? (should-build-dropoff? world last-dropoff-location)
-            halite-to-save (if (and build-dropoff? (seq dropoff-locations))
-                             (- DROPOFF_COST (apply max (map :halite dropoff-locations)))
+            halite-to-save (if (and build-dropoff? (or (> width 32)
+                                                       (seq dropoff-locations)))
+                             (- DROPOFF_COST (apply max 500 (map :halite dropoff-locations)))
                              0)
             world (assoc world
                          :reserve halite-to-save
@@ -978,8 +980,15 @@
                                          dropoff-location)
             other-ships (get-my-ships-that-can-move stuck-ships my-player)
             other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
+            sort-order (if (or (two-player? world)
+                               (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                               (< turns-left CRASH_TURNS_LEFT))
+                         (compare-by :halite desc :dropoff-distance desc :cell-halite desc)
+                         (compare-by :cell-halite desc :halite desc :dropoff-distance desc))
+
             ; collecting-ships (sort (compare-by :cell-halite desc :halite desc :dropoff-distance desc))
-            collecting-ships (sort (compare-by :halite desc :dropoff-distance desc :cell-halite desc)
+            ; collecting-ships (sort (compare-by :halite desc :dropoff-distance desc :cell-halite desc)
+            collecting-ships (sort sort-order
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))
