@@ -210,10 +210,10 @@
   "Figure out who will collect what from a fight based on looking out up to 7 turns..."
   [world cell my-ship their-ship]
   (let [;; Include the inspiration bonus. Assume if I'm inspired they are too - since inspire can move don't count on it for full 3 times effect.
-        multiplier (if (inspired-cell? world cell) 1.8 1)
+        multiplier (if (inspired-cell? world cell) 3 1)
         dropped-halite (* (+ (:halite my-ship) (:halite their-ship))
                           multiplier)]
-    (loop [remaining-halite dropped-halite
+    (loop [remaining-halite (+ dropped-halite (:halite cell))
            iteration 1
            total-halite 0
            delta-carry 0
@@ -221,13 +221,15 @@
                               (= (:id their-ship) (:id %)))
                          (get-ships-in-cells world (conj (get-in cell [:neighbors 1]) cell)))]
       (if (or (<= remaining-halite 20)
-              (> iteration 5))
+              (> iteration 6))
         {:total total-halite :leftover remaining-halite}
         (let [ships (remove ghost-ship? ships)
               [my-carry-capacity other-carry-capacity] (get-carrying-capacity world ships)
-              delta (long (- my-carry-capacity other-carry-capacity))
-              delta (+ delta-carry delta)
-              gathered-one-round (if (= 0 delta)
+              delta-round (long (- my-carry-capacity other-carry-capacity))
+              can-gather? (or (and (>= delta-carry 0) (>= delta-round 0))
+                              (and (<= delta-carry 0) (<= delta-round 0)))
+              delta (+ delta-carry delta-round)
+              gathered-one-round (if (or (= 0 delta) (not can-gather?) (= 1 iteration))
                                    0
                                    (min (Math/abs delta) (* GATHER_AMOUNT multiplier remaining-halite)))
               delta-carry (if (> delta 0)
@@ -304,28 +306,33 @@
   (when (and ship (not= 0 (:dropoff-distance cell)))
     (let [enemy-ships (filter #(and (not= (:my-id world) (:owner %))
                                     (not (ghost-ship? %)))
-                              (get-ships-in-cells world (get-in cell [:neighbors 1])))
-          scores (map #(int (score-collision world ship % cell)) enemy-ships)
-          low-score (when (seq scores)
-                      (apply min scores))
-          low-score (if (or (nil? low-score)
-                            (two-player? world))
-                      low-score
-                      (if (= (select-keys ship [:x :y]) (select-keys cell [:x :y]))
-                        (+ low-score (* 0.25 (get-value-of-a-ship world)))
-                        ; (+ low-score (* 0.25 (get-value-of-a-ship world)))
-                        (- low-score (get-value-of-a-ship world))))]
+                              (get-ships-in-cells world (get-in cell [:neighbors 1])))]
+      (if (empty? enemy-ships)
+        false
+        (if (at-enemy-dropoff? world cell)
+          true
+          (let [scores (map #(int (score-collision world ship % cell)) enemy-ships)
+                low-score (when (seq scores)
+                            (apply min scores))
+                low-score (if (or (nil? low-score)
+                                  (two-player? world))
+                            low-score
+                            (if (= (select-keys ship [:x :y]) (select-keys cell [:x :y]))
+                              (+ low-score (* 0.25 (get-value-of-a-ship world)))
+                              ; (+ low-score (* 0.25 (get-value-of-a-ship world)))
+                              (- low-score (get-value-of-a-ship world))))]
 
-      ; (flog world cell "RD: enemy-ships" enemy-ships)
-      (when (seq scores)
-        (if (< low-score 0)
-          (flog-color world cell (str "Scores:" (pr-str scores)) :brown)
-          (flog-color world cell (str "Scores:" (pr-str scores)) :yellow))
-        (< low-score 0)))))
+            ; (flog world cell "RD: enemy-ships" enemy-ships)
+            (when (seq scores)
+              (if (< low-score 0)
+                (flog-color world cell (str "Scores:" (pr-str scores)) :brown)
+                (flog-color world cell (str "Scores:" (pr-str scores)) :yellow))
+              (< low-score 0))))))))
 
 (defn should-ram-new?
+  ""
   [world ship cell]
-  (when ship
+  (when (and ship (not (at-enemy-dropoff? world cell)))
     (when-let [other-ship (:ship cell)]
       ; (when (< (:halite ship) (:halite other-ship))
         (let [score (int (score-collision world ship other-ship cell))

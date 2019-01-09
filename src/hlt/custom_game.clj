@@ -660,8 +660,9 @@
         ship-location-map (build-ship-location-map world (> turns-left turns-to-start-crashing))
         world (assoc world :ship-location-map ship-location-map :updated-ship-location-map ship-location-map)
         other-player-ships (mapcat :ships other-players)
-        changed-locations (get-changed-locations-for-ships last-round-other-player-ships
-                                                           other-player-ships)
+        changed-locations (set (get-changed-locations-for-ships last-round-other-player-ships
+                                                                other-player-ships))
+        changed-locations (set (concat changed-locations (map #(select-keys % [:x :y]) updated-cells)))
         potential-locations (set (mapcat #(get-locations-in-inspiration-range world %)
                                          changed-locations))
         ; _ (log "Changed locations are:" changed-locations)
