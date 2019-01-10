@@ -5,6 +5,8 @@
    [hlt.game :refer :all]
    [hlt.custom-game :refer :all]))
 
+(set! *warn-on-reflection* true)
+
 ;; TODO Get these parameters back in the main code
 (def MIN_CRASH_FOR_HALITE 330)
 (def CRASH_TURNS_LEFT 25)
@@ -258,7 +260,7 @@
           (recur remaining-halite
                  (inc iteration)
                  total-halite
-                 delta-carry
+                 (long delta-carry)
                  (get-ships-in-cells world (get-in cell [:neighbors (inc iteration)]))))))))
 
 (defn spoils-of-war
@@ -304,28 +306,33 @@
   (when (and ship (not= 0 (:dropoff-distance cell)))
     (let [enemy-ships (filter #(and (not= (:my-id world) (:owner %))
                                     (not (ghost-ship? %)))
-                              (get-ships-in-cells world (get-in cell [:neighbors 1])))
-          scores (map #(int (score-collision world ship % cell)) enemy-ships)
-          low-score (when (seq scores)
-                      (apply min scores))
-          low-score (if (or (nil? low-score)
-                            (two-player? world))
-                      low-score
-                      (if (= (select-keys ship [:x :y]) (select-keys cell [:x :y]))
-                        (+ low-score (* 0.25 (get-value-of-a-ship world)))
-                        ; (+ low-score (* 0.25 (get-value-of-a-ship world)))
-                        (- low-score (get-value-of-a-ship world))))]
+                              (get-ships-in-cells world (get-in cell [:neighbors 1])))]
+      (if (empty? enemy-ships)
+        false
+        (if (at-enemy-dropoff? world cell)
+          true
+          (let [scores (map #(int (score-collision world ship % cell)) enemy-ships)
+                low-score (when (seq scores)
+                            (apply min scores))
+                low-score (if (or (nil? low-score)
+                                  (two-player? world))
+                            low-score
+                            (if (= (select-keys ship [:x :y]) (select-keys cell [:x :y]))
+                              (+ low-score (* 0.25 (get-value-of-a-ship world)))
+                              ; (+ low-score (* 0.25 (get-value-of-a-ship world)))
+                              (- low-score (get-value-of-a-ship world))))]
 
-      ; (flog world cell "RD: enemy-ships" enemy-ships)
-      (when (seq scores)
-        (if (< low-score 0)
-          (flog-color world cell (str "Scores:" (pr-str scores)) :brown)
-          (flog-color world cell (str "Scores:" (pr-str scores)) :yellow))
-        (< low-score 0)))))
+            ; (flog world cell "RD: enemy-ships" enemy-ships)
+            (when (seq scores)
+              (if (< low-score 0)
+                (flog-color world cell (str "Scores:" (pr-str scores)) :brown)
+                (flog-color world cell (str "Scores:" (pr-str scores)) :yellow))
+              (< low-score 0))))))))
 
 (defn should-ram-new?
+  ""
   [world ship cell]
-  (when ship
+  (when (and ship (not (at-enemy-dropoff? world cell)))
     (when-let [other-ship (:ship cell)]
       ; (when (< (:halite ship) (:halite other-ship))
         (let [score (int (score-collision world ship other-ship cell))

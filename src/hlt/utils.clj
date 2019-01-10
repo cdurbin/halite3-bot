@@ -7,7 +7,9 @@
    [clojure.java.io :as clj-io]
    [cheshire.core :as json]))
 
-(def bot-name "Durbinator-v183")
+(set! *warn-on-reflection* true)
+
+(def bot-name "Durbinator-v189")
 
 (def INFINITY 999999)
 

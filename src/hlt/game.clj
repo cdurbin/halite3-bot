@@ -5,6 +5,8 @@
    [cheshire.core :as json]
    [hlt.utils :refer :all]))
 
+(set! *warn-on-reflection* true)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Constants
 (def NORTH "n")
