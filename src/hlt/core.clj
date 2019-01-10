@@ -964,7 +964,12 @@
                                          dropoff-location)
             other-ships (get-my-ships-that-can-move stuck-ships my-player)
             other-ships (remove #(= (:id dropoff-ship) (:id %)) other-ships)
-            collecting-ships (sort (compare-by :cell-halite desc :halite desc :dropoff-distance desc)
+            sort-order (if (or (two-player? world)
+                               (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                               (< turns-left CRASH_TURNS_LEFT))
+                         (compare-by :halite desc :dropoff-distance desc :cell-halite desc)
+                         (compare-by :cell-halite desc :halite desc :dropoff-distance desc))
+            collecting-ships (sort sort-order
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))

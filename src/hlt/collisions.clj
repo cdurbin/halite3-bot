@@ -208,6 +208,63 @@
   (keep #(get (:updated-ship-location-map world) (select-keys % [:x :y]))
         locations))
 
+(defn play-out-fight-more-accurate
+  "Figure out who will collect what from a fight based on looking out up to 7 turns..."
+  [world cell my-ship their-ship]
+  (let [;; Include the inspiration bonus. Assume if I'm inspired they are too - since inspire can move don't count on it for full 3 times effect.
+        multiplier (if (inspired-cell? world cell) 3 1)
+        dropped-halite (* (+ (:halite my-ship) (:halite their-ship))
+                          multiplier)]
+    (loop [remaining-halite (+ dropped-halite (:halite cell))
+           iteration 1
+           total-halite 0
+           delta-carry 0
+           ships (remove #(or (= (:id my-ship) (:id %))
+                              (= (:id their-ship) (:id %)))
+                         (get-ships-in-cells world (conj (get-in cell [:neighbors 1]) cell)))]
+      (if (or (<= remaining-halite 20)
+              (> iteration 6))
+        {:total total-halite :leftover remaining-halite}
+        (let [ships (remove ghost-ship? ships)
+              [my-carry-capacity other-carry-capacity] (get-carrying-capacity world ships)
+              delta-round (long (- my-carry-capacity other-carry-capacity))
+              can-gather? (or (and (>= delta-carry 0) (>= delta-round 0))
+                              (and (<= delta-carry 0) (<= delta-round 0)))
+              delta (+ delta-carry delta-round)
+              gathered-one-round (if (or (= 0 delta) (not can-gather?) (= 1 iteration))
+                                   0
+                                   (min (Math/abs delta) (* GATHER_AMOUNT multiplier remaining-halite)))
+              delta-carry (if (> delta 0)
+                            (- delta gathered-one-round)
+                            (+ delta gathered-one-round))
+              ; delta (if (> (Math/abs delta) remaining-halite)
+              ;         (if (> delta 0)
+              ;           remaining-halite
+              ;           (* -1 remaining-halite))
+              ;         delta)
+              remaining-halite (- remaining-halite gathered-one-round)
+              total-halite (if (> delta 0)
+                             (long (+ total-halite gathered-one-round))
+                             (long (- total-halite gathered-one-round)))]
+          ; (log (format (str "Turn: %d, iteration %d, cell %s, ships: %s, my-carry-capacity: %d, "
+          ;                   "other-carry-capacity: %d, delta %d, delta-carry %d, gathered-one-round %d, "
+          ;                   "total-halite (aka score): %d")
+          ;              (:turn world)
+          ;              iteration
+          ;              (select-keys cell [:x :y])
+          ;              (pr-str ships)
+          ;              my-carry-capacity
+          ;              other-carry-capacity
+          ;              (long delta)
+          ;              (long delta-carry)
+          ;              (long gathered-one-round)
+          ;              (long total-halite)))
+          (recur remaining-halite
+                 (inc iteration)
+                 total-halite
+                 (long delta-carry)
+                 (get-ships-in-cells world (get-in cell [:neighbors (inc iteration)]))))))))
+
 (defn play-out-fight
   "Figure out who will collect what from a fight based on looking out up to 7 turns..."
   [world cell my-ship their-ship]
@@ -267,7 +324,9 @@
   "Returns a value of the net halite change from a collision. This could get complicated to
   track correctly, but is probably one of the most important things to get right in this game."
   [world my-ship cell their-ship]
-  (let [{:keys [total leftover]} (play-out-fight world cell my-ship their-ship)]
+  (let [{:keys [total leftover]} (if (two-player? world)
+                                   (play-out-fight-more-accurate world cell my-ship their-ship)
+                                   (play-out-fight world cell my-ship their-ship))]
     ; (flog world cell (str "SOW: total" total "leftover" leftover))
     (if (<= 0 leftover)
       total
