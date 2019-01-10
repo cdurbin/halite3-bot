@@ -35,17 +35,29 @@
 (def MIN_SHIPS_BEFORE_IGNORE_GHOST 45)
 (def MAX_TURNS_EVALUATE 5)
 
+; (def halite-burn-map
+;   {2 {32 16
+;       40 14
+;       48 12
+;       56 8
+;       64 8}
+;    4 {32 12
+;       40 12
+;       48 14
+;       56 14
+;       64 14}})
+
 (def halite-burn-map
-  {2 {32 16
-      40 14
-      48 12
-      56 8
-      64 8}
-   4 {32 12
-      40 12
-      48 14
-      56 14
-      64 14}})
+  {2 {32 32
+      40 28
+      48 28
+      56 28
+      64 28}
+   4 {32 28
+      40 28
+      48 28
+      56 28
+      64 28}})
 
 (def min-per-spawn-ship
   {2 {32 810
@@ -355,7 +367,9 @@
               (if target
                 (let [
                       ; safe-cells (remove #(= STILL (:direction %)) safe-cells)
-                      best-direction (get-best-gather-direction world ship target safe-cells)
+                      best-direction (if (two-player? world)
+                                       (get-best-direction world ship target safe-cells)
+                                       (get-best-gather-direction world ship target safe-cells))
                       best-direction (or best-direction STILL)]
                   (log "Nearby Target is " (select-keys target [:x :y :halite]) "and best direction" best-direction)
                   {:ship ship
@@ -372,7 +386,9 @@
                                 (get-gather-amount target))]
                     (if (and target (>= mined mined-this-turn))
                       (let [; safe-cells (remove #(= STILL (:direction %)) safe-cells)
-                            best-direction (get-best-gather-direction world ship target safe-cells)
+                            best-direction (if (two-player? world)
+                                             (get-best-direction world ship target safe-cells)
+                                             (get-best-gather-direction world ship target safe-cells))
                             best-direction (or best-direction STILL)]
                         (log "Target is " target "and best direction" best-direction)
                         (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
