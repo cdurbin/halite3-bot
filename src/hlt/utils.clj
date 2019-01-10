@@ -9,7 +9,7 @@
 
 (set! *warn-on-reflection* true)
 
-(def bot-name "Durbinator-v190")
+(def bot-name "Durbinator-v191")
 
 (def INFINITY 999999)
 

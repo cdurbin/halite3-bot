@@ -185,17 +185,27 @@
     (:direction closest-target)))
 
 ;; TODO I don't think anything should actually call this
+; (defn get-best-gather-direction
+;   "Returns the best direction to move to get to a target."
+;   [world ship target cells]
+;   (let [{:keys [width height]} world
+;         closest-target (first (sort (compare-by :cost asc :distance asc :halite desc)
+;                                     (map #(let [distance (distance-between width height target %)]
+;                                             (assoc %
+;                                                    :distance distance
+;                                                    :cost (+ (* 0.1 MOVE_COST (:halite %))
+;                                                             (get-inspire-delta-by-move world ship %)
+;                                                             (- (* 2000 (/ 1 (+ distance 0.5)))))))
+;                                          cells)))]
+;     (:direction closest-target)))
+
 (defn get-best-gather-direction
   "Returns the best direction to move to get to a target."
   [world ship target cells]
   (let [{:keys [width height]} world
-        closest-target (first (sort (compare-by :cost asc :distance asc :halite desc)
+        closest-target (first (sort (compare-by :distance asc :halite desc)
                                     (map #(let [distance (distance-between width height target %)]
-                                            (assoc %
-                                                   :distance distance
-                                                   :cost (+ (* 0.1 MOVE_COST (:halite %))
-                                                            (get-inspire-delta-by-move world ship %)
-                                                            (- (* 2000 (/ 1 (+ distance 0.5)))))))
+                                            (assoc % :distance distance))
                                          cells)))]
     (:direction closest-target)))
 
@@ -383,11 +393,11 @@
         banned-cells (:banned-cells world)
         surrounding-cells (for [direction SURROUNDING_DIRECTIONS]
                             (assoc (get-location world ship direction) :direction direction))
-        surrounding-cells (conj surrounding-cells (assoc (get-cell world ship) :direction STILL))
-        ram-cell (first (filter #(and
-                                      (not (ghost-ship? (:ship %)))
-                                      (should-ram? world ship %))
-                                surrounding-cells))]
+        surrounding-cells (conj surrounding-cells (assoc (get-cell world ship) :direction STILL))]
+        ; ram-cell (first (filter #(and
+        ;                               (not (ghost-ship? (:ship %)))
+        ;                               (should-ram? world ship %))
+        ;                         surrounding-cells))]
    ; (if ram-cell
    ;   (do (log "I am going to ram with ship " ship "and cell" (select-keys ram-cell [:x :y]))
    ;       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
