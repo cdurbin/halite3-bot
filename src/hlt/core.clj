@@ -657,7 +657,7 @@
 (defn get-top-cells
   "Returns the top pct cells by score"
   [world pct]
-  (let [{:keys [cells width height ship-location-map my-id turns-left]} world
+  (let [{:keys [cells width height ship-location-map my-id turns-left my-ship-count]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
         cells (remove #(when-let [ship (get ship-location-map (select-keys % [:x :y]))]
@@ -676,7 +676,8 @@
         best-cells (if (or (two-player? world)
                            (< width 35)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
-                           (< turns-left CRASH_TURNS_LEFT))
+                           (< turns-left CRASH_TURNS_LEFT)
+                           (< my-ship-count 6))
                      cells
                      (filter (fn [cell]
                                (let [nearby-ships (get-five-range-ships world cell)]
@@ -876,7 +877,14 @@
         last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
         world (assoc world
                      :last-turn last-turn :last-spawn-turn last-spawn-turn
-                     :last-dropoff-turn last-dropoff-turn)]
+                     :last-dropoff-turn last-dropoff-turn)
+
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ;; Third round timeout potential fixes
+        world (assoc world :cells cells :turn 0)]
+    (should-build-dropoff? world true)
+    ; (Thread/sleep 10000)
+    ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     (println bot-name)
     (loop [cells cells
            last-round-ships nil
@@ -889,6 +897,7 @@
             {:keys [ship-location-map potential-locations updated-cells my-player turns-left
                     players turn cells other-players
                     potential-locations other-player-ships]} world
+            ; _ (when (> turn 3) (println "DEAD"))
             score-potential-locations (mapcat #(get-locations-in-inspiration-range world %)
                                               updated-cells)
             score-potential-locations (set (concat score-potential-locations
