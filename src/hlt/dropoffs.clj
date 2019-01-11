@@ -17,9 +17,21 @@
 ; (def MIN_DROPOFF_SCORE 5100)
 
 (def MIN_SHIPS_PER_DROPOFF 13)
-(def MIN_SHIPS_FOR_FIRST_DROPOFF 10)
-(def MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER 10)
+; (def MIN_SHIPS_FOR_FIRST_DROPOFF 10)
+; (def MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER 10)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
+
+(def min-ships-for-first-dropoff
+  {2 {32 10
+      40 10
+      48 12
+      56 12
+      64 12}
+   4 {32 10
+      40 10
+      48 11
+      56 11
+      64 11}})
 
 (def FAR_DROPOFF 25)
 (def AUTO_BUILD_DROPOFF 2500)
@@ -203,9 +215,7 @@
         total-ship-count (inc total-ship-count)
         my-ship-count (count (:ships my-player))
         my-num-dropoffs (inc (count (:dropoffs my-player)))
-        first-dropoff-ships (if (two-player? world)
-                              MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER
-                              MIN_SHIPS_FOR_FIRST_DROPOFF)]
+        first-dropoff-ships (get-in min-ships-for-first-dropoff [num-players width])]
     (log "Total halite:" total-halite "total-ship-count" total-ship-count)
     (log "Calculation of halite per ship:" (int (/ total-halite total-ship-count)))
     (log "Turn is " turn "last dropoff-turn is" last-dropoff-turn)

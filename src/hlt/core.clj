@@ -48,16 +48,16 @@
 ;       64 14}})
 
 (def halite-burn-map
-  {2 {32 32
-      40 28
-      48 28
-      56 28
-      64 28}
-   4 {32 28
-      40 28
-      48 28
-      56 28
-      64 28}})
+  {2 {32 16
+      40 14
+      48 14
+      56 12
+      64 12}
+   4 {32 12
+      40 14
+      48 16
+      56 16
+      64 14}})
 
 (def min-per-spawn-ship
   {2 {32 810
@@ -299,10 +299,22 @@
           (not= my-id (-> cell :ship :owner)))
       (safe-location? world ship location))))
 
+(def best-direction-fn
+  {2 {32 get-best-direction
+      40 get-best-direction
+      48 get-best-direction
+      56 get-best-direction
+      64 get-best-gather-direction}
+   4 {32 get-best-gather-direction
+      40 get-best-gather-direction
+      48 get-best-gather-direction
+      56 get-best-gather-direction
+      64 get-best-gather-direction}})
+
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
   [world ship]
-  (let [{:keys [my-shipyard try-to-spawn?]} world
+  (let [{:keys [my-shipyard try-to-spawn? num-players width]} world
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) SURROUNDING_DIRECTIONS)
         surrounding-cells (if (= 0 (:dropoff-distance (get-cell world ship)))
                             surrounding-cells
@@ -367,9 +379,7 @@
               (if target
                 (let [
                       ; safe-cells (remove #(= STILL (:direction %)) safe-cells)
-                      best-direction (if (two-player? world)
-                                       (get-best-direction world ship target safe-cells)
-                                       (get-best-gather-direction world ship target safe-cells))
+                      best-direction ((get-in best-direction-fn [num-players width]) world ship target safe-cells)
                       best-direction (or best-direction STILL)]
                   (log "Nearby Target is " (select-keys target [:x :y :halite]) "and best direction" best-direction)
                   {:ship ship
@@ -386,9 +396,7 @@
                                 (get-gather-amount target))]
                     (if (and target (>= mined mined-this-turn))
                       (let [; safe-cells (remove #(= STILL (:direction %)) safe-cells)
-                            best-direction (if (two-player? world)
-                                             (get-best-direction world ship target safe-cells)
-                                             (get-best-gather-direction world ship target safe-cells))
+                            best-direction ((get-in best-direction-fn [num-players width]) world ship target safe-cells)
                             best-direction (or best-direction STILL)]
                         (log "Target is " target "and best direction" best-direction)
                         (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
