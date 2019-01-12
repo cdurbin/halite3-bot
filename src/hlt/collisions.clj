@@ -3,7 +3,8 @@
   (:require
    [hlt.utils :refer :all]
    [hlt.game :refer :all]
-   [hlt.custom-game :refer :all]))
+   [hlt.custom-game :refer :all])
+  (:gen-class))
 
 (set! *warn-on-reflection* true)
 

@@ -5,18 +5,19 @@
    [clj-time.format :as time-format]
    [clj-time.local :as local]
    [clojure.java.io :as clj-io]
-   [cheshire.core :as json]))
+   [cheshire.core :as json])
+  (:gen-class))
 
 (set! *warn-on-reflection* true)
 
-(def bot-name "Durbinator-v195")
+(def bot-name "Durbinator-v196")
 
 (def INFINITY 999999)
 
 (defmacro defn-timed
-  "Creates a function that logs how long it took to execute the body. It supports multiarity functions
-  but only times how long the last listed arity version takes. This means it should be used with
-  multiarity functions where it calls itself with the extra arguments."
+  "Creates a function that logs how long it took to execute the body. It supports multiarity
+  functions but only times how long the last listed arity version takes. This means it should be
+  used with multiarity functions where it calls itself with the extra arguments."
   [fn-name & fn-tail]
   (let [fn-name-str (name fn-name)
         ns-str (str *ns*)

@@ -4,7 +4,8 @@
   (:require
    [clojure.set :as set]
    [hlt.utils :refer :all]
-   [hlt.game :refer :all]))
+   [hlt.game :refer :all])
+  (:gen-class))
 
 (set! *warn-on-reflection* true)
 

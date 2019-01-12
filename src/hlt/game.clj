@@ -3,7 +3,8 @@
   (:require
    [clojure.string :as string]
    [cheshire.core :as json]
-   [hlt.utils :refer :all]))
+   [hlt.utils :refer :all])
+  (:gen-class))
 
 (set! *warn-on-reflection* true)
 
