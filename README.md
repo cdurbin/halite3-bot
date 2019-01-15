@@ -4,6 +4,10 @@ Starter bot for Halite 3 written in Clojure
 
 ## TODO
 
+### 1/14
+* Figure out what's causing the exceptions
+* Modify get-collect-move to figure out the actual number of turns to get to full Halite based on 4 cell mining + staying in this quadrant vs. moving to another quadrant
+
 ### 1/8
 
 * Figure out number of turns before I could possibly build a dropoff.

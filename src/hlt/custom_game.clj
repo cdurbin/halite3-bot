@@ -4,7 +4,8 @@
   (:require
    [clojure.set :as set]
    [hlt.utils :refer :all]
-   [hlt.game :refer :all])
+   [hlt.game :refer :all]
+   [hlt.map-analysis :refer :all])
   (:gen-class))
 
 (set! *warn-on-reflection* true)
@@ -631,17 +632,25 @@
                    :inspiration inspiration-neighbors}]
     (assoc cell :neighbors neighbors)))
 
+(defn add-quadrant
+  "Adds quadrant info to a cell."
+  [world cell]
+  (assoc cell :quadrant (cell->quadrant (select-keys cell [:x :y]))))
+
 (defn build-world-for-round
   "Builds up the world for the current round."
   [world last-round-other-player-ships turns-to-start-crashing]
   (let [{:keys [last-turn my-id cells other-shipyards width height my-shipyard num-players
-                last-spawn-turn last-dropoff-turn]} world
+                last-spawn-turn last-dropoff-turn quadrant-distances]} world
         turn (Integer/parseInt (read-line))
         _ (log "Turn" turn)
         ; _ (log "Last round ships" last-round-ships)
         turns-left (- last-turn turn)
-        players (doall (for [i (range num-players)]
-                         (load-player)))
+        players (doall (for [i (range num-players)
+                             :let [player (load-player)]]
+                         (update player :ships (fn [ships]
+                                                 (map #(assoc % :quadrant (cell->quadrant (select-keys % [:x :y])))
+                                                      ships)))))
         my-player (first (filter #(= my-id (:player-id %)) players))
         other-players (remove #(= my-id (:player-id %)) players)
         updated-cells (load-updated-cells)
@@ -659,7 +668,8 @@
                :num-players num-players :my-ship-count (count (:ships my-player))
                :total-halite total-halite :total-ship-count total-ship-count
                :enemy-dropoffs enemy-dropoffs :total-other-ship-halite total-other-ship-halite
-               :my-id my-id :updated-cells updated-cells :other-players other-players}
+               :my-id my-id :updated-cells updated-cells :other-players other-players
+               :quadrant-distances quadrant-distances}
         ship-location-map (build-ship-location-map world (> turns-left turns-to-start-crashing))
         world (assoc world :ship-location-map ship-location-map :updated-ship-location-map ship-location-map)
         other-player-ships (mapcat :ships other-players)
@@ -671,8 +681,11 @@
         ; _ (log "Potential locations are:" potential-locations)
         inspire-update-cells (map #(inspire-cell world %) potential-locations)
         cells (combine-cells inspire-update-cells cells)]
+    ;     quadrant-metrics (get-quadrant-metrics (assoc world :cells cells))]
+    ; (log "QM:" quadrant-metrics)
     (assoc world :updated-cells updated-cells :potential-locations potential-locations
           :other-player-ships other-player-ships :cells cells)))
+          ; :quadrant-metrics quadrant-metrics)))
 
 (defn unwind-collisions
   "Any time there is a collision try to back out moves until there is no longer a collision."

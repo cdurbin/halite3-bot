@@ -31,9 +31,15 @@
   6.) predict how much halite will be left to gather N turns from now
 
   Questions: Do I need to track updates to a quadrant mid-turn?
+
+  Algorithm - at beginning of turn assume all ships will stay in their current quadrants. Then
+  update to
   "
   (:require
-   [hlt.game :refer :all])
+   [hlt.game :refer :all]
+   [hlt.utils :refer :all]
+   [clojure.java.io :as io]
+   [clojure.edn :as edn])
   (:gen-class))
 
 (set! *warn-on-reflection* true)
@@ -67,6 +73,43 @@
                                  (< (:y cell) width))
                         quadrant))
                     cell->quadrant))])))
+
+(defn calculate-cell-and-quadrant->distance
+  "Maps a cell to the distance to each other quadrant."
+  [world]
+  (let [{:keys [width height]} world]
+    (into {}
+      (for [x (range width)
+            y (range height)
+            quadrant (range 64)
+            :when (some #{quadrant} (get valid-quadrants width))
+            :let [distances (map #(distance-between width height {:x x :y y} %)
+                                 (get quadrant->cells quadrant))]]
+        [{:x x :y y :quadrant quadrant} (apply min distances)]))))
+
+(defn load-cell-and-quadrant->distance
+  "Loads in cell and quadrant distance from a file (pre-calculated in a file)."
+  [width]
+  (edn/read-string (slurp (io/resource (str width ".edn")))))
+
+(comment
+ (def from-file (load-cell-and-quadrant->distance 64))
+ (get valid-quadrants 32)
+ (def the-test (calculate-cell-and-quadrant->distance {:width 32 :height 32}))
+ (def the-64-test (calculate-cell-and-quadrant->distance {:width 64 :height 64}))
+ (spit "32.edn" (calculate-cell-and-quadrant->distance {:width 32 :height 32}))
+ (spit "40.edn" (calculate-cell-and-quadrant->distance {:width 40 :height 40}))
+ (spit "48.edn" (calculate-cell-and-quadrant->distance {:width 48 :height 48}))
+ (spit "56.edn" (calculate-cell-and-quadrant->distance {:width 56 :height 56}))
+ (spit "64.edn" (calculate-cell-and-quadrant->distance {:width 64 :height 64}))
+ (map (fn [c]
+        [c (distance-between 32 32 {:x 0 :y 0} c)])
+      (get quadrant->cells 2))
+ (get the-test {:x 0 :y 0 :quadrant 10})
+ (get from-file {:x 0 :y 0 :quadrant 33})
+ (first from-file)
+ (get quadrant->cells 15))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;; Metrics
@@ -76,12 +119,53 @@
   (/ (reduce + (map get-gather-amount cells))
      (count cells)))
 
-(defn get-quadrant-metrics
-  "Returns all of the relevant metrics for a quadrant."
-  [world quadrant]
-  (let [{:keys [cells]} world
-        quadrant-cells (filter #(= quadrant (:quadrant %)) (vals cells))
-        avg-gather-per-cell (avg-gather-amount-per-cell world quadrant-cells)]))
+(defn avg-gather-amount-per-ship
+  "Returns average gather amount per quadrant cell."
+  [world cells ships]
+  (/ (reduce + (map get-gather-amount cells))
+     (max 1 (count ships))))
+
+(defn get-top-scoring-cell
+  "Returns the top cell from a list of cells."
+  [cells]
+  (first (sort (compare-by :score desc) cells)))
+
+(defn get-cells-by-quadrant
+  "Returns a map of quadrants as keys and all the cells within each quadrant as the values."
+  [world]
+  (group-by :quadrant (vals (:cells world))))
+
+(defn get-ships-by-quadrant
+  "Returns a map of ships by quadrant."
+  [world]
+  (group-by :quadrant (mapcat :ships (:players world))))
+
+(defn-timed get-quadrant-metrics
+  "Returns all of the relevant metrics for all quadrants."
+  [world]
+  (let [quadrant-cells (get-cells-by-quadrant world)
+        quadrant-ships (get-ships-by-quadrant world)]
+    (reduce (fn [metrics quadrant]
+              (let [quadrant-num (key quadrant)
+                    cells (val quadrant)
+                    total-halite (reduce + (map #(+ (:halite %) (get-bonus %))
+                                                cells))
+                    ship-count (count (get quadrant-ships quadrant-num))
+                    ; avg-gather-per-cell (avg-gather-amount-per-cell world cells)
+                    ; avg-gather-per-ship (avg-gather-amount-per-ship world cells
+                    ;                                                 (get quadrant-ships quadrant-num))
+                    metrics-for-quadrant {
+                                          ; :avg-gather-per-cell avg-gather-per-cell
+                                          ; :avg-gather-per-ship avg-gather-per-ship
+                                          :total-halite total-halite
+                                          :ship-count ship-count}]
+                                          ; :top-scoring-cell (get-top-scoring-cell cells)}]
+                (assoc metrics quadrant-num metrics-for-quadrant)))
+            {}
+            quadrant-cells)))
 
 (comment
- (get valid-quadrants 64))
+ (group-by :a
+   [{:a 1 :b "C" :c "DDD"}
+    {:a 1 :b "8" :c 9}
+    {:a 2 :b 3}]))

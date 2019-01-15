@@ -10,7 +10,8 @@
    [hlt.game :refer :all]
    [hlt.custom-game :refer :all]
    [hlt.dropoffs :refer :all]
-   [hlt.collisions :refer :all])
+   [hlt.collisions :refer :all]
+   [hlt.map-analysis :refer :all])
   (:gen-class))
 
 (set! *warn-on-reflection* true)
@@ -342,7 +343,7 @@
                 best-direction (or best-direction STILL)]
             (log "Target is " (select-keys (:target ship) [:x :y]) "and best direction" best-direction)
             (flog world (:target ship) (format "Ship %d existing target" (:id ship)) :orange)
-            {:ship ship
+            {:ship (assoc ship :quadrant (cell->quadrant (select-keys (:target ship) [:x :y])))
              :target (:target ship)
              :direction best-direction
              :reason (str "Moving to target" (select-keys (:target ship) [:x :y :halite]))})
@@ -373,7 +374,7 @@
                      ; (= (select-keys ship [:x :y]) (select-keys target [:x :y]))
                      (some #{STILL} (map :direction safe-cells))
                      (>= mined-this-turn (:last-turn-gain target)))
-              {:ship ship
+              {:ship (assoc ship :quadrant (cell->quadrant (select-keys ship [:x :y])))
                :direction STILL
                :reason (str "collect more from current cell than last turn gain of target." (select-keys target [:x :y]))}
               (if target
@@ -382,14 +383,16 @@
                       best-direction ((get-in best-direction-fn [num-players width]) world ship target safe-cells)
                       best-direction (or best-direction STILL)]
                   (log "Nearby Target is " (select-keys target [:x :y :halite]) "and best direction" best-direction)
-                  {:ship ship
+                  {:ship (assoc ship :quadrant (cell->quadrant (select-keys ship [:x :y])))
                    :direction best-direction
                    :reason (str "Moving to best target in my nearby cells" (select-keys target [:x :y :halite]))})
                 ;; Need to choose a new target
                 (if ram-cell
                   (do (log "I am going to ram with ship " (:id ship) "and cell" (select-keys ram-cell [:x :y]))
                       (flog world ram-cell (format "Ramming with ship %d" (:id ship)) :green)
-                      (assoc ram-cell :ship ship :reason "Ramming ship."))
+                      (assoc ram-cell
+                             :ship (assoc ship :quadrant (cell->quadrant (select-keys ram-cell [:x :y])))
+                             :reason "Ramming ship."))
                   (let [target (get-top-cell-target world ship)
                         mined (if (nil? (:halite target))
                                 INFINITY
@@ -400,20 +403,27 @@
                             best-direction (or best-direction STILL)]
                         (log "Target is " target "and best direction" best-direction)
                         (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
-                        {:ship (assoc ship :target target)
+                        {:ship (assoc ship
+                                      :target target
+                                      :quadrant (cell->quadrant (select-keys target [:x :y])))
                          :target target
                          :direction best-direction
                          :reason (str "There were no good targets so I picked" (select-keys target [:x :y :halite]))})
-                      {:ship ship
+                      {:ship (assoc ship :quadrant (cell->quadrant (select-keys ship [:x :y])))
                        :direction STILL
                        :reason (str "Supposed to go to " (select-keys target [:x :y]) "but that's worse than my current cell.")}))))))))))
 
 (defn get-dropoff-move
   "Returns a move towards a dropoff site."
   [world ship]
-  (let [the-key (if (:advance ship)
+  (let [cell (get-cell world ship)
+        the-key (if (:advance ship)
                   :next-dropoff-distance
                   :dropoff-distance)
+        dropoff-target (if (:advance ship)
+                         (:next-dropoff-target cell)
+                         (:dropoff-target cell))
+        ship (assoc ship :quadrant (cell->quadrant (select-keys dropoff-target [:x :y])))
         banned-cells (:banned-cells world)
         surrounding-cells (for [direction SURROUNDING_DIRECTIONS]
                             (assoc (get-location world ship direction) :direction direction))
@@ -510,7 +520,11 @@
   "Returns moves and an updated world."
   [world ships]
   (reduce (fn [{:keys [world moves]} ship]
-            (let [move (get-move world ship)
+            (let [quadrant-metrics (:quadrant-metrics world)
+                  orig-quadrant (:quadrant ship)
+                  move (get-move world ship)
+                  new-quadrant (-> move :ship :quadrant)
+                  quadrant-change? (not= orig-quadrant new-quadrant)
                   target (:target move)
                   direction (:direction move)
                   banned-cells (or (:banned-cells move)
@@ -551,9 +565,17 @@
                                                    (select-keys cell [:x :y])))
                                               (:top-cells world))
                                       (:top-cells world))
+                  _ (log "Original quadrant" orig-quadrant)
+                  _ (log "New quadrant" new-quadrant)
+                  quadrant-metrics (if quadrant-change?
+                                      (-> quadrant-metrics
+                                          (update-in [orig-quadrant :ship-count] dec)
+                                          (update-in [new-quadrant :ship-count] inc))
+                                      quadrant-metrics)
                   moves (conj moves move)]
               {:world (assoc world
                              :top-cells updated-top-cells
+                             :quadrant-metrics quadrant-metrics
                              :my-player (assoc (:my-player world) :ships updated-ships)
                              :banned-cells banned-cells)
                :moves moves}))
@@ -573,6 +595,8 @@
      (+ (* 1.25 (:halite cell))
         (reduce + (map :halite surrounding-cells)))]))
 
+(def NEXT_DISTANCE_DELTA 1)
+
 (defn decorate-cells
   "Adds dropoff distance and a score to each cell. Handles multiple shipyards and choose the min distance."
   [world cells-to-update shipyards next-dropoffs]
@@ -580,16 +604,32 @@
         {:keys [width height]} world]
     (into {}
       (for [cell cells-to-update
-            :let [min-distance (first (sort (map #(distance-between width height cell %) dropoffs)))
-                  next-distance (apply min min-distance (if (seq next-dropoffs)
-                                                          (map #(distance-between width height cell %)
-                                                               next-dropoffs)
-                                                          [INFINITY]))
+            :let [
+                  ;; TODO pick a closest dropoff location for use when a ship is dropping off to
+                  ;; list the quadrant it will be in when it drops off and is ready to collect.
+                  dropoff-distances (map #(assoc % :distance (distance-between width height cell %))
+                                         dropoffs)
+                  best-dropoff (first (sort (compare-by :distance asc) dropoff-distances))
+                  min-distance (:distance best-dropoff)
+                  potential-dropoff-distances (map #(assoc % :distance (distance-between width height cell %))
+                                                   next-dropoffs)
+                  potential-next-best-dropoff (first (sort (compare-by :distance asc) potential-dropoff-distances))
+                  potential-next-distance (if potential-next-best-dropoff
+                                            (:distance potential-next-best-dropoff)
+                                            INFINITY)
+                  next-distance (if (<= potential-next-distance (+ NEXT_DISTANCE_DELTA min-distance))
+                                  potential-next-distance
+                                  min-distance)
+                  next-best-dropoff (if (<= potential-next-distance (+ NEXT_DISTANCE_DELTA min-distance))
+                                      potential-next-best-dropoff
+                                      best-dropoff)
                   [score uninspired-score] (score-cell world cell)]]
                   ; enemy-side-count (get-surrounded-enemy-count world cell)]]
                   ; uninspired-score (- uninspired-score (* 100 min-distance))]]
         [(select-keys cell [:x :y]) (assoc cell
                                            :dropoff-distance min-distance
+                                           :dropoff-target best-dropoff
+                                           :next-dropoff-target next-best-dropoff
                                            :next-dropoff-distance next-distance
                                            :score score
                                            :uninspired-score uninspired-score)]))))
@@ -871,13 +911,16 @@
   (let [world (load-world)
         {:keys [my-shipyard cells width height num-players my-id other-shipyards]} world
         cells (map #(add-neighbors world %) (vals cells))
+        cells (map #(add-quadrant world %) cells)
         cells (doall (decorate-cells world cells [my-shipyard] nil))
         last-turn (total-turns height width)
         last-spawn-turn (* last-turn (get last-spawn-turn-pct num-players))
         last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
+        quadrant-distances (load-cell-and-quadrant->distance width)
         world (assoc world
                      :last-turn last-turn :last-spawn-turn last-spawn-turn
-                     :last-dropoff-turn last-dropoff-turn)
+                     :last-dropoff-turn last-dropoff-turn
+                     :quadrant-distances quadrant-distances)
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;; Third round timeout potential fixes
@@ -1000,6 +1043,9 @@
                     (assign-dropoff-moves world)
                     world)
             dropoff-location (when-not dropoff-ship dropoff-location)
+            quadrant-metrics (get-quadrant-metrics (assoc world :cells cells))
+            _ (log "QM:" quadrant-metrics)
+            world (assoc world :quadrant-metrics quadrant-metrics)
             my-player (:my-player world)
 
             stuck-ships (get-stuck-ships world (remove #(= (:id dropoff-ship) (:id %))
@@ -1016,6 +1062,7 @@
                                    (filter #(= :collect (:mode %)) other-ships))
             dropoff-ships (sort (compare-by :dropoff-distance asc :halite desc)
                                 (filter #(= :dropoff (:mode %)) other-ships))
+
             dropoff-advance-ships (get-dropoff-advance-ships world dropoff-ships)
             _ (doseq [s dropoff-advance-ships]
                 (flog-color world s "ADVANCE" :yellow))
@@ -1023,6 +1070,7 @@
                                     (decorate-advance-dropoff-ships next-advance-ship ships))
                                   dropoff-ships
                                   dropoff-advance-ships)
+
             {:keys [world moves]} (get-moves-and-world world (concat stuck-ships
                                                                      dropoff-ships
                                                                      collecting-ships))
