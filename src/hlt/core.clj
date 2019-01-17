@@ -403,7 +403,7 @@
                         ;                               (+ (:total-halite current-quadrant-metrics)
                         ;                                  (:total-bonus current-quadrant-metrics)))
                         ; per-turn-collection (* GATHER_AMOUNT avg-gather-amount-per-cell)
-                        needed-halite (- MAX_HALITE_CARRY (:halite-carried orig-target))
+                        needed-halite (- MAX_HALITE_CARRY (get orig-target :halite-carried (:halite ship)))
                         turns-to-full (+ MAX_TURNS_EVALUATE (int (/ needed-halite (max 1 (:avg-gather-per-cell current-quadrant-metrics)))))
                         ; _ (log "Turns to full is: " turns-to-full "Valid quadrants are " valid-quadrants)
                         potential-quadrants (keep (fn [quadrant-num]
