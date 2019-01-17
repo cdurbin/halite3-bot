@@ -142,7 +142,7 @@
     (+ (* 0.25 score) (* 0.75 uninspired-score) (* 250 my-nearby-count)
        (- (* 100 dropoff-distance)))))
 
-(def NUM_POTENTIAL_DROPOFFS 17)
+(def NUM_POTENTIAL_DROPOFFS 7)
 
 (defn choose-best-dropoffs
   "Returns the best dropoff from a list of dropoff locations."
