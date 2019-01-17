@@ -30,6 +30,7 @@
 
 (def last-spawn-turn-pct
   {2 0.52
+  ; {2 0.69
    4 0.70})
 
 (def LAST_TURN_DROPOFF_PCT 0.80)
@@ -315,7 +316,8 @@
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
   [world ship]
-  (let [{:keys [my-shipyard try-to-spawn? num-players width]} world
+  (let [{:keys [my-shipyard try-to-spawn? num-players width quadrant-metrics quadrant-distances
+                valid-quadrants]} world
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) SURROUNDING_DIRECTIONS)
         surrounding-cells (if (= 0 (:dropoff-distance (get-cell world ship)))
                             surrounding-cells
@@ -359,6 +361,7 @@
                 target (first (sort (compare-by :turns asc :halite-carried desc :dropoff-distance desc)
                                     nearby-cells))
                 mined-this-turn (get-gather-amount current-cell)
+                orig-target target
                 target (if (and target
                                 (>= (:turns target) MAX_TURNS_EVALUATE)
                                 (seq (:top-cells world))
@@ -393,15 +396,44 @@
                       (assoc ram-cell
                              :ship (assoc ship :quadrant (cell->quadrant (select-keys ram-cell [:x :y])))
                              :reason "Ramming ship."))
-                  (let [target (get-top-cell-target world ship)
+                  ;; TODO insert quadrant specific logic
+                  (let [current-quadrant-metrics (get quadrant-metrics (:quadrant ship))
+                        ; _ (log "CQM: " (pr-str current-quadrant-metrics))
+                        ; avg-gather-amount-per-cell (* inverse-cells-per-quadrant
+                        ;                               (+ (:total-halite current-quadrant-metrics)
+                        ;                                  (:total-bonus current-quadrant-metrics)))
+                        ; per-turn-collection (* GATHER_AMOUNT avg-gather-amount-per-cell)
+                        needed-halite (- MAX_HALITE_CARRY (:halite-carried orig-target))
+                        turns-to-full (+ MAX_TURNS_EVALUATE (int (/ needed-halite (max 1 (:avg-gather-per-cell current-quadrant-metrics)))))
+                        ; _ (log "Turns to full is: " turns-to-full "Valid quadrants are " valid-quadrants)
+                        potential-quadrants (keep (fn [quadrant-num]
+                                                    (let [distance (get quadrant-distances {:x (:x ship) :y (:y ship) :quadrant quadrant-num})]
+                                                      (when (< distance (inc turns-to-full))
+                                                        {:quadrant quadrant-num :distance distance})))
+                                                  valid-quadrants)
+                        best-quadrant (get-best-quadrant world ship needed-halite potential-quadrants turns-to-full)
+                        same-quadrant? (= best-quadrant (:quadrant ship))
+                        ; potential-quadrants (filter (fn [quadrant]
+                        ;                               (let [metrics (get quadrant-metrics quadrant)]
+                        ;                                 (< (distance-between width height ship (:top-scoring-cell metrics)))))
+                        ;                             (remove #(= % (:quadrant ship)
+                        ;                                         (keys quadrant-metrics))))])))))))))
+
+                  ;;;;;;;;;;;;;
+                  ; (let [target (get-top-cell-target world ship)
+                        target (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
+                        ; target (if same-quadrant?
+                        ;          orig-target
+                        ;          (get-in quadrant-metrics [best-quadrant :top-scoring-cell]))
                         mined (if (nil? (:halite target))
                                 INFINITY
                                 (get-gather-amount target))]
+                    ; (log "CDD: target is" target "best quadrant is:" best-quadrant)
                     (if (and target (>= mined mined-this-turn))
                       (let [; safe-cells (remove #(= STILL (:direction %)) safe-cells)
                             best-direction ((get-in best-direction-fn [num-players width]) world ship target safe-cells)
                             best-direction (or best-direction STILL)]
-                        (log "Target is " target "and best direction" best-direction)
+                        ; (log "Target is " target "and best direction" best-direction)
                         (flog world target (format "Chose new target for %d" (:id ship)) :yellow)
                         {:ship (assoc ship
                                       :target target
@@ -568,9 +600,7 @@
                   _ (log "Original quadrant" orig-quadrant)
                   _ (log "New quadrant" new-quadrant)
                   quadrant-metrics (if quadrant-change?
-                                      (-> quadrant-metrics
-                                          (update-in [orig-quadrant :ship-count] dec)
-                                          (update-in [new-quadrant :ship-count] inc))
+                                      (update-quadrant-metrics quadrant-metrics orig-quadrant new-quadrant)
                                       quadrant-metrics)
                   moves (conj moves move)]
               {:world (assoc world
@@ -917,10 +947,12 @@
         last-spawn-turn (* last-turn (get last-spawn-turn-pct num-players))
         last-dropoff-turn (* last-turn LAST_TURN_DROPOFF_PCT)
         quadrant-distances (load-cell-and-quadrant->distance width)
+        valid-quadrants (map-size->valid-quadrants width)
         world (assoc world
                      :last-turn last-turn :last-spawn-turn last-spawn-turn
                      :last-dropoff-turn last-dropoff-turn
-                     :quadrant-distances quadrant-distances)
+                     :quadrant-distances quadrant-distances
+                     :valid-quadrants valid-quadrants)
 
     ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     ;; Third round timeout potential fixes
@@ -1044,7 +1076,7 @@
                     world)
             dropoff-location (when-not dropoff-ship dropoff-location)
             quadrant-metrics (get-quadrant-metrics (assoc world :cells cells))
-            _ (log "QM:" quadrant-metrics)
+            ; _ (log "QM:" quadrant-metrics)
             world (assoc world :quadrant-metrics quadrant-metrics)
             my-player (:my-player world)
 

@@ -662,14 +662,15 @@
         total-other-ship-halite (- (reduce + (map :halite (mapcat :ships players)))
                                    (reduce + (map :halite (:ships my-player))))
         enemy-dropoffs (concat other-shipyards (mapcat :dropoffs other-players))
-        world {:width width :height height :players players :my-player my-player :cells cells
-               :turn turn :last-spawn-turn last-spawn-turn :turns-left turns-left
-               :last-dropoff-turn last-dropoff-turn :my-shipyard my-shipyard
-               :num-players num-players :my-ship-count (count (:ships my-player))
-               :total-halite total-halite :total-ship-count total-ship-count
-               :enemy-dropoffs enemy-dropoffs :total-other-ship-halite total-other-ship-halite
-               :my-id my-id :updated-cells updated-cells :other-players other-players
-               :quadrant-distances quadrant-distances}
+        world (merge world
+                    {:width width :height height :players players :my-player my-player :cells cells
+                     :turn turn :last-spawn-turn last-spawn-turn :turns-left turns-left
+                     :last-dropoff-turn last-dropoff-turn :my-shipyard my-shipyard
+                     :num-players num-players :my-ship-count (count (:ships my-player))
+                     :total-halite total-halite :total-ship-count total-ship-count
+                     :enemy-dropoffs enemy-dropoffs :total-other-ship-halite total-other-ship-halite
+                     :my-id my-id :updated-cells updated-cells :other-players other-players
+                     :quadrant-distances quadrant-distances})
         ship-location-map (build-ship-location-map world (> turns-left turns-to-start-crashing))
         world (assoc world :ship-location-map ship-location-map :updated-ship-location-map ship-location-map)
         other-player-ships (mapcat :ships other-players)

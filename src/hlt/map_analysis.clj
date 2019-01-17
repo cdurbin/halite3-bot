@@ -43,6 +43,12 @@
   (:gen-class))
 
 (set! *warn-on-reflection* true)
+
+(def cells-per-quadrant 64)
+; (def cells-per-quadrant 16)
+(def num-quadrants 64)
+; (def num-quadrants 256)
+(def inverse-cells-per-quadrant (double (/ 1 cells-per-quadrant)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Setup quadrants
 (def cell->quadrant
@@ -54,16 +60,25 @@
        (+ (int (/ x 8))
           (* 8 (int (/ y 8))))])))
 
+; (def cell->quadrant
+;   "Map from {:x :y} to a quadrant."
+;   (into {}
+;     (for [x (range 64)
+;           y (range 64)]
+;       [{:x x :y y}
+;        (+ (int (/ x 4))
+;           (* 4 (int (/ y 4))))])))
+
 (def quadrant->cells
   "Map from quadrant to the cells in that quadrant."
   (into {}
-    (for [q (range 64)]
+    (for [q (range num-quadrants)]
       [q (keep (fn [[k v]]
                  (when (= q v)
                    k))
                cell->quadrant)])))
 
-(def valid-quadrants
+(def map-size->valid-quadrants
   "Map width to valid quadrants."
   (into {}
     (for [width [32 40 48 56 64]]
@@ -81,8 +96,8 @@
     (into {}
       (for [x (range width)
             y (range height)
-            quadrant (range 64)
-            :when (some #{quadrant} (get valid-quadrants width))
+            quadrant (range num-quadrants)
+            :when (some #{quadrant} (map-size->valid-quadrants width))
             :let [distances (map #(distance-between width height {:x x :y y} %)
                                  (get quadrant->cells quadrant))]]
         [{:x x :y y :quadrant quadrant} (apply min distances)]))))
@@ -91,17 +106,18 @@
   "Loads in cell and quadrant distance from a file (pre-calculated in a file)."
   [width]
   (edn/read-string (slurp (io/resource (str width ".edn")))))
+  ; (edn/read-string (slurp (io/resource (str width "-small.edn")))))
 
 (comment
  (def from-file (load-cell-and-quadrant->distance 64))
  (get valid-quadrants 32)
  (def the-test (calculate-cell-and-quadrant->distance {:width 32 :height 32}))
  (def the-64-test (calculate-cell-and-quadrant->distance {:width 64 :height 64}))
- (spit "32.edn" (calculate-cell-and-quadrant->distance {:width 32 :height 32}))
- (spit "40.edn" (calculate-cell-and-quadrant->distance {:width 40 :height 40}))
- (spit "48.edn" (calculate-cell-and-quadrant->distance {:width 48 :height 48}))
- (spit "56.edn" (calculate-cell-and-quadrant->distance {:width 56 :height 56}))
- (spit "64.edn" (calculate-cell-and-quadrant->distance {:width 64 :height 64}))
+ (spit "32-small.edn" (calculate-cell-and-quadrant->distance {:width 32 :height 32}))
+ (spit "40-small.edn" (calculate-cell-and-quadrant->distance {:width 40 :height 40}))
+ (spit "48-small.edn" (calculate-cell-and-quadrant->distance {:width 48 :height 48}))
+ (spit "56-small.edn" (calculate-cell-and-quadrant->distance {:width 56 :height 56}))
+ (spit "64-small.edn" (calculate-cell-and-quadrant->distance {:width 64 :height 64}))
  (map (fn [c]
         [c (distance-between 32 32 {:x 0 :y 0} c)])
       (get quadrant->cells 2))
@@ -112,18 +128,22 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(def NUM_CELLS_TO_AVG 10)
+
 ;;; Metrics
 (defn avg-gather-amount-per-cell
   "Returns average gather amount per quadrant cell."
   [world cells]
-  (/ (reduce + (map get-gather-amount cells))
-     (count cells)))
+  (/ (reduce + (map get-gather-amount (take NUM_CELLS_TO_AVG (sort (compare-by :score desc) cells))))
+     NUM_CELLS_TO_AVG))
+     ; (count cells)))
 
 (defn avg-gather-amount-per-ship
   "Returns average gather amount per quadrant cell."
   [world cells ships]
-  (/ (reduce + (map get-gather-amount cells))
-     (max 1 (count ships))))
+  ; (/ (reduce + (map get-gather-amount cells))
+  (/ (reduce + (map get-gather-amount (take NUM_CELLS_TO_AVG (sort (compare-by :score desc) cells))))
+    (max 1 (count ships))))
 
 (defn get-top-scoring-cell
   "Returns the top cell from a list of cells."
@@ -148,21 +168,63 @@
     (reduce (fn [metrics quadrant]
               (let [quadrant-num (key quadrant)
                     cells (val quadrant)
-                    total-halite (reduce + (map #(+ (:halite %) (get-bonus %))
-                                                cells))
+                    total-halite (reduce + (map :halite cells))
+                    total-bonus (reduce + (map get-bonus cells))
                     ship-count (count (get quadrant-ships quadrant-num))
-                    ; avg-gather-per-cell (avg-gather-amount-per-cell world cells)
+                    avg-gather-per-cell (avg-gather-amount-per-cell world cells)
+                    per-turn-gather (* ship-count avg-gather-per-cell)
                     ; avg-gather-per-ship (avg-gather-amount-per-ship world cells
                     ;                                                 (get quadrant-ships quadrant-num))
                     metrics-for-quadrant {
-                                          ; :avg-gather-per-cell avg-gather-per-cell
+                                          :avg-gather-per-cell avg-gather-per-cell
+                                          :per-turn-gather per-turn-gather
                                           ; :avg-gather-per-ship avg-gather-per-ship
                                           :total-halite total-halite
-                                          :ship-count ship-count}]
-                                          ; :top-scoring-cell (get-top-scoring-cell cells)}]
+                                          :total-bonus total-bonus
+                                          ;; TODO guessing at an inspiration in N turns is probably
+                                          ;; important
+                                          :ship-count ship-count
+                                          :top-scoring-cell (get-top-scoring-cell cells)}]
                 (assoc metrics quadrant-num metrics-for-quadrant)))
             {}
             quadrant-cells)))
+
+(defn update-quadrant-metrics
+  "Updates a quadrant-metrics based on a ship changing quadrants."
+  [metrics old-quadrant new-quadrant]
+  (let [new-quadrant-metrics (get metrics new-quadrant)
+        new-quadrant-ships (inc (:ship-count new-quadrant-metrics))
+        new-per-turn-gather (* new-quadrant-ships (:avg-gather-per-cell new-quadrant-metrics))
+        new-quadrant-metrics (assoc new-quadrant-metrics
+                                    :ship-count new-quadrant-ships
+                                    :per-turn-gather new-per-turn-gather)
+        old-quadrant-metrics (get metrics old-quadrant)
+        old-quadrant-ships (dec (:ship-count old-quadrant-metrics))
+        old-per-turn-gather (* old-quadrant-ships (:avg-gather-per-cell old-quadrant-metrics))
+        old-quadrant-metrics (assoc old-quadrant-metrics
+                                    :ship-count old-quadrant-ships
+                                    :per-turn-gather old-per-turn-gather)]
+    (assoc metrics old-quadrant old-quadrant-metrics new-quadrant new-quadrant-metrics)))
+
+(defn get-turns-for-needed-halite
+  "Returns the number of turns it takes to gather the required halite."
+  [world needed-halite quadrant-num]
+  (let [metrics (get-in world [:quadrant-metrics quadrant-num])]
+    ; (log "Metrics are:" metrics "Quadrant number is:" quadrant-num)
+    ; (log "QMS:" (pr-str (:quadrant-metrics world)))
+    (/ needed-halite (max 1 (:avg-gather-per-cell metrics)))))
+
+(defn get-best-quadrant
+  "Returns the best quadrant to try to gather from based on the needed-halite"
+  [world location needed-halite potential-quadrants max-turns]
+  ; (log "Potential quadrants were:" (pr-str potential-quadrants))
+  (let [quadrants (map (fn [{:keys [quadrant distance]}]
+                         {:quadrant quadrant
+                          :distance distance
+                          :turns (+ distance (get-turns-for-needed-halite world needed-halite quadrant))})
+                       potential-quadrants)]
+    ; (log "Quadrants are:" (pr-str quadrants))
+    (:quadrant (first (sort (compare-by :turns asc :distance asc) quadrants)))))
 
 (comment
  (group-by :a
