@@ -413,14 +413,9 @@
                                                   valid-quadrants)
                         best-quadrant (get-best-quadrant world ship needed-halite potential-quadrants turns-to-full)
                         same-quadrant? (= best-quadrant (:quadrant ship))
-                        ; potential-quadrants (filter (fn [quadrant]
-                        ;                               (let [metrics (get quadrant-metrics quadrant)]
-                        ;                                 (< (distance-between width height ship (:top-scoring-cell metrics)))))
-                        ;                             (remove #(= % (:quadrant ship)
-                        ;                                         (keys quadrant-metrics))))])))))))))
-
                   ;;;;;;;;;;;;;
-                        target (if (two-player? world)
+                        target (if (and (two-player? world)
+                                        (<= width 45))
                                  (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
                                  (get-top-cell-target world ship))
                         ; target (get-in quadrant-metrics [best-quadrant :top-scoring-cell])

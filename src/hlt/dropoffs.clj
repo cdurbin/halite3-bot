@@ -148,13 +148,13 @@
   {2 {32 5
       40 6
       48 7
-      56 9
-      64 12}
-   4 {32 7
-      40 7
+      56 7
+      64 7}
+   4 {32 5
+      40 5
       48 7
-      56 10
-      64 15}})
+      56 6
+      64 20}})
 
 (defn choose-best-dropoffs
   "Returns the best dropoff from a list of dropoff locations."
