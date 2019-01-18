@@ -142,14 +142,28 @@
     (+ (* 0.25 score) (* 0.75 uninspired-score) (* 250 my-nearby-count)
        (- (* 100 dropoff-distance)))))
 
-(def NUM_POTENTIAL_DROPOFFS 7)
+; (def NUM_POTENTIAL_DROPOFFS 7)
+
+(def num-potential-dropoffs
+  {2 {32 5
+      40 6
+      48 7
+      56 9
+      64 12}
+   4 {32 7
+      40 7
+      48 7
+      56 10
+      64 15}})
 
 (defn choose-best-dropoffs
   "Returns the best dropoff from a list of dropoff locations."
   [world dropoffs]
-  (let [dropoffs-with-scores (map #(assoc % :custom-score (custom-dropoff-score world %))
+  (let [{:keys [width num-players]} world
+        dropoffs-with-scores (map #(assoc % :custom-score (custom-dropoff-score world %))
                                   dropoffs)]
-    (take NUM_POTENTIAL_DROPOFFS (sort (compare-by :custom-score desc) dropoffs-with-scores))))
+    (take (get-in num-potential-dropoffs [num-players width])
+          (sort (compare-by :custom-score desc) dropoffs-with-scores))))
 
 (defn choose-dropoff-locations
   "Given a bunch of choices for dropoff locations. Choose the one(s) that could be the most

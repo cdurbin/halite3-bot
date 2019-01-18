@@ -420,8 +420,10 @@
                         ;                                         (keys quadrant-metrics))))])))))))))
 
                   ;;;;;;;;;;;;;
-                  ; (let [target (get-top-cell-target world ship)
-                        target (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
+                        target (if (two-player? world)
+                                 (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
+                                 (get-top-cell-target world ship))
+                        ; target (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
                         ; target (if same-quadrant?
                         ;          orig-target
                         ;          (get-in quadrant-metrics [best-quadrant :top-scoring-cell]))
