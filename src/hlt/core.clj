@@ -290,16 +290,45 @@
            :halite-carried (min MAX_HALITE_CARRY halite-carried)}
           (recur cell-halite halite-carried (inc turns)))))))
 
+(defn can-reach-cell?
+  "Returns true if there is a path I could take to get from start to end location."
+  [world start end]
+  (let [{:keys [width height my-id]} world
+        end-location (select-keys end [:x :y])]
+    (loop [potential-directions SURROUNDING_DIRECTIONS
+           start-cell (get-cell world start)
+           current-distance (distance-between width height start-cell end-location)]
+      (if (= (select-keys start-cell [:x :y]) end-location)
+        true
+        (let [distance-maps (keep (fn [direction]
+                                    (let [cell (get-location world start-cell direction)
+                                          distance (distance-between width height cell end-location)]
+                                      (when (and (< distance current-distance)
+                                                 (or (nil? (:ship cell))
+                                                     (not= my-id (-> cell :ship :owner))))
+                                        {:direction direction
+                                         :cell cell})))
+                                  potential-directions)
+              winner (first distance-maps)]
+          (if (nil? winner)
+            false
+            (let [potential-directions (remove #(= (:direction winner) (get opposite-direction %))
+                                               potential-directions)]
+              (recur potential-directions
+                     (:cell winner)
+                     (dec current-distance)))))))))
+
 (defn should-mine-cell?
   "Returns true if I should try to mine a cell."
   [world ship cell location]
   (let [{:keys [my-id turns-left]} world]
-    (if (or (two-player? world))
-            ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
-            ; (< (:turns-left world) CRASH_TURNS_LEFT))
-      (or (nil? (:ship cell))
-          (not= my-id (-> cell :ship :owner)))
-      (safe-location? world ship location))))
+    (and (if (or (two-player? world))
+                  ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                  ; (< (:turns-left world) CRASH_TURNS_LEFT))
+           (or (nil? (:ship cell))
+               (not= my-id (-> cell :ship :owner)))
+           (safe-location? world ship location))
+         (can-reach-cell? world ship cell))))
 
 (def best-direction-fn
   {2 {32 get-best-direction
@@ -1028,6 +1057,8 @@
                          :uninspired-cells uninspired-cells
                          :min-top-cell-score min-top-cell-score
                          :min-uninspired-score min-uninspired-score)
+            ; updated-dropoff-cells (decorate-dropoff-cells world (conj (:dropoffs my-player) my-shipyard))
+            ; cells (merge cells updated-dropoff-cells)
             build-dropoff-distance (get-dropoff-distance (count (:dropoffs my-player)))
             dropoff-location (when (and last-dropoff-location
                                         (>= (:dropoff-distance (get-cell world last-dropoff-location))
