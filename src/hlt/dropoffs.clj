@@ -28,8 +28,8 @@
       48 10
       56 12
       64 11}
-   4 {32 7
-      40 7
+   4 {32 9
+      40 9
       48 11
       56 10
       64 11}})
@@ -39,6 +39,7 @@
 
 (def NEXT_DROPOFF_DISTANCE 5)
 (def NEARBY_DROPOFF_HALITE 5000)
+; (def NEARBY_DROPOFF_HALITE 2100)
 
 (def REQUIRED_NEARBY_HALITE 5100)
 (def USEFUL_DROPOFF_DISTANCE 16)

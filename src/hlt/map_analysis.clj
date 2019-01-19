@@ -128,7 +128,7 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(def NUM_CELLS_TO_AVG 10)
+(def NUM_CELLS_TO_AVG 16)
 
 ;;; Metrics
 (defn avg-gather-amount-per-cell
@@ -158,7 +158,8 @@
 (defn get-ships-by-quadrant
   "Returns a map of ships by quadrant."
   [world]
-  (group-by :quadrant (mapcat :ships (:players world))))
+  ; (group-by :quadrant (mapcat :ships (:players world)))
+  (group-by :quadrant (map :ships (:my-player world))))
 
 (defn-timed get-quadrant-metrics
   "Returns all of the relevant metrics for all quadrants."
@@ -208,11 +209,17 @@
 
 (defn get-turns-for-needed-halite
   "Returns the number of turns it takes to gather the required halite."
-  [world needed-halite quadrant-num]
-  (let [metrics (get-in world [:quadrant-metrics quadrant-num])]
+  [world needed-halite quadrant-num distance]
+  (let [metrics (get-in world [:quadrant-metrics quadrant-num])
+        {:keys [per-turn-gather total-halite total-bonus top-scoring-cell]} metrics
+        remaining-halite (- (+ total-halite total-bonus)
+                            (* per-turn-gather distance 0.5))
+        avg-gather-once-there (/ remaining-halite NUM_CELLS_TO_AVG)]
+
     ; (log "Metrics are:" metrics "Quadrant number is:" quadrant-num)
     ; (log "QMS:" (pr-str (:quadrant-metrics world)))
-    (/ needed-halite (max 1 (:avg-gather-per-cell metrics)))))
+    (+ (/ needed-halite (max 1 avg-gather-once-there)))))
+       ; (:next-dropoff-distance top-scoring-cell))))
 
 (defn get-best-quadrant
   "Returns the best quadrant to try to gather from based on the needed-halite"
@@ -221,7 +228,7 @@
   (let [quadrants (map (fn [{:keys [quadrant distance]}]
                          {:quadrant quadrant
                           :distance distance
-                          :turns (+ distance (get-turns-for-needed-halite world needed-halite quadrant))})
+                          :turns (+ distance (get-turns-for-needed-halite world needed-halite quadrant distance))})
                        potential-quadrants)]
     ; (log "Quadrants are:" (pr-str quadrants))
     (:quadrant (first (sort (compare-by :turns asc :distance asc) quadrants)))))

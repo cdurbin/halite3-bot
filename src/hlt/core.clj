@@ -173,6 +173,28 @@
                                          cells)))]
     closest-target))
 
+(defn get-top-cell-target-quadrant
+  "Returns the target to move after."
+  [world ship quadrant]
+  (let [{:keys [width height top-cells uninspired-cells dropoff-locations move-towards-dropoff?
+                good-dropoffs]} world
+        cells (if (and (seq dropoff-locations)
+                       move-towards-dropoff?
+                       (<= (apply min (map #(distance-between width height ship %) dropoff-locations))
+                           FLOW_DISTANCE))
+                (concat dropoff-locations good-dropoffs)
+                (if (:motivated ship)
+                  (concat top-cells good-dropoffs)
+                  (concat good-dropoffs uninspired-cells)))
+        ; cells (if (:motivated ship) top-cells uninspired-cells)
+        field-comparison (if (:motivated ship) :score :uninspired-score)
+        closest-target (first (sort (compare-by :distance asc field-comparison desc)
+                                    (map #(assoc % :distance (distance-between width height ship %))
+                                         (filter #(= quadrant (:quadrant %)) cells))))]
+    (if closest-target
+      closest-target
+      (get-top-cell-target world ship))))
+
 (defn get-uninspired-cell-target
   "Returns the target to move after."
   [world ship]
@@ -346,7 +368,7 @@
   "Returns a move to collect as much halite as possible."
   [world ship]
   (let [{:keys [my-shipyard try-to-spawn? num-players width quadrant-metrics quadrant-distances
-                valid-quadrants]} world
+                valid-quadrants turns-left]} world
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) SURROUNDING_DIRECTIONS)
         surrounding-cells (if (= 0 (:dropoff-distance (get-cell world ship)))
                             surrounding-cells
@@ -443,10 +465,14 @@
                         best-quadrant (get-best-quadrant world ship needed-halite potential-quadrants turns-to-full)
                         same-quadrant? (= best-quadrant (:quadrant ship))
                   ;;;;;;;;;;;;;
-                        target (if (and (two-player? world)
-                                        (<= width 45))
+                        target (if ;true
+                                   (or (and (two-player? world)
+                                            (<= width 45))
+                                       (little-halite-left? world MIN_CRASH_FOR_HALITE)
+                                       (< turns-left CRASH_TURNS_LEFT))
                                  (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
-                                 (get-top-cell-target world ship))
+                                 (get-top-cell-target-quadrant world ship best-quadrant))
+                                 ; (get-top-cell-target world ship))
                         ; target (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
                         ; target (if same-quadrant?
                         ;          orig-target
