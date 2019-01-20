@@ -98,13 +98,16 @@
   [world]
   (and (enough-spawn-halite? world)
        (let [{:keys [turn last-dropoff-turn players my-player cells num-players total-halite
-                     total-ship-count total-other-ship-halite last-spawn-turn width turns-left]} world
+                     total-ship-count total-other-ship-halite last-spawn-turn width turns-left
+                     players my-id]} world
              my-ship-count (count (:ships my-player))
              my-num-dropoffs (inc (count (:dropoffs my-player)))
              amount-i-can-steal (get-steal-amount world)
              my-share (/ (+ amount-i-can-steal total-halite) (inc my-ship-count))]
          (or (and (two-player? world)
-                  (<= my-ship-count (- total-ship-count my-ship-count))
+                  (or (<= my-ship-count (- total-ship-count my-ship-count))
+                      (> (:halite my-player) (+ 4000 (:halite (first (filter #(not= my-id (:id %))
+                                                                             players))))))
                   (> turns-left (+ 35 TURNS_TO_START_CRASHING)))
              (and (< turn last-spawn-turn)
                   (or (> (/ (+ amount-i-can-steal total-halite) total-ship-count)
@@ -292,31 +295,30 @@
 
 (defn can-reach-cell?
   "Returns true if there is a path I could take to get from start to end location."
-  [world start end]
+  [world start end potential-directions]
   (let [{:keys [width height my-id]} world
-        end-location (select-keys end [:x :y])]
-    (loop [potential-directions SURROUNDING_DIRECTIONS
-           start-cell (get-cell world start)
-           current-distance (distance-between width height start-cell end-location)]
-      (if (= (select-keys start-cell [:x :y]) end-location)
-        true
-        (let [distance-maps (keep (fn [direction]
-                                    (let [cell (get-location world start-cell direction)
-                                          distance (distance-between width height cell end-location)]
-                                      (when (and (< distance current-distance)
-                                                 (or (nil? (:ship cell))
-                                                     (not= my-id (-> cell :ship :owner))))
-                                        {:direction direction
-                                         :cell cell})))
-                                  potential-directions)
-              winner (first distance-maps)]
-          (if (nil? winner)
-            false
-            (let [potential-directions (remove #(= (:direction winner) (get opposite-direction %))
-                                               potential-directions)]
-              (recur potential-directions
-                     (:cell winner)
-                     (dec current-distance)))))))))
+        end-location (select-keys end [:x :y])
+        current-distance (distance-between width height start end-location)]
+    (if (= (select-keys start [:x :y]) end-location)
+      true
+      (let [distance-maps (keep (fn [direction]
+                                  (let [cell (get-location world start direction)
+                                        distance (distance-between width height cell end-location)]
+                                    (when (and (< distance current-distance)
+                                               (or (nil? (:ship cell))
+                                                   (not= my-id (-> cell :ship :owner))))
+                                      {:direction direction
+                                       :cell cell})))
+                                potential-directions)
+            ; winner (first distance-maps)
+            any-reach? (first (keep (fn [good-spot]
+                                      (let [potential-directions (remove #(= (:direction good-spot) (get opposite-direction %))
+                                                                        potential-directions)]
+                                        (can-reach-cell? world (:cell good-spot) end potential-directions)))
+                                    distance-maps))]
+        (if any-reach?
+          true
+          false)))))
 
 (defn should-mine-cell?
   "Returns true if I should try to mine a cell."
@@ -325,8 +327,9 @@
     (if (two-player? world)
       (and (or (nil? (:ship cell))
                (not= my-id (-> cell :ship :owner)))
-           (can-reach-cell? world ship cell))
-      (safe-location? world ship location))))
+           (can-reach-cell? world ship cell SURROUNDING_DIRECTIONS))
+      (and (safe-location? world ship location)
+           (can-reach-cell? world ship cell SURROUNDING_DIRECTIONS)))))
 
 (def best-direction-fn
   {2 {32 get-best-direction
@@ -780,7 +783,7 @@
                              cells))]
     [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
                                                                       best-cells)))
-     (take num-cells-to-return (sort (compare-by :uninspired-score desc) best-cells))]))
+     (take num-cells-to-return (sort (compare-by :uninspired-score desc) cells))]))
 
 (defn remove-bad-targets
   "If my current cell is better than my target - get rid of my target."
