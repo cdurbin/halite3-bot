@@ -34,6 +34,18 @@
       56 10
       64 11}})
 
+(def num-potential-dropoffs
+  {2 {32 5
+      40 5
+      48 5
+      56 17
+      64 17}
+   4 {32 8
+      40 8
+      48 7
+      56 5
+      64 17}})
+
 (def FAR_DROPOFF 25)
 (def AUTO_BUILD_DROPOFF 2500)
 
@@ -155,18 +167,6 @@
 ;       48 7
 ;       56 6
 ;       64 20}})
-
-(def num-potential-dropoffs
-  {2 {32 5
-      40 5
-      48 5
-      56 17
-      64 17}
-   4 {32 8
-      40 8
-      48 8
-      56 5
-      64 17}})
 
 (defn choose-best-dropoffs
   "Returns the best dropoff from a list of dropoff locations."

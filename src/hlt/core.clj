@@ -322,13 +322,11 @@
   "Returns true if I should try to mine a cell."
   [world ship cell location]
   (let [{:keys [my-id turns-left]} world]
-    (and (if (or (two-player? world))
-                  ; (little-halite-left? world MIN_CRASH_FOR_HALITE)
-                  ; (< (:turns-left world) CRASH_TURNS_LEFT))
-           (or (nil? (:ship cell))
+    (if (two-player? world)
+      (and (or (nil? (:ship cell))
                (not= my-id (-> cell :ship :owner)))
-           (safe-location? world ship location))
-         (can-reach-cell? world ship cell))))
+           (can-reach-cell? world ship cell))
+      (safe-location? world ship location))))
 
 (def best-direction-fn
   {2 {32 get-best-direction
