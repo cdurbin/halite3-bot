@@ -14,10 +14,22 @@
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 40)
 ; (def NUM_POTENTIAL_DROPOFFS 1)
-(def MIN_DROPOFF_SCORE 6500)
-; (def MIN_DROPOFF_SCORE 5100)
+; (def MIN_DROPOFF_SCORE 4500)
 
-(def MIN_SHIPS_PER_DROPOFF 13)
+(def min-dropoff-score
+  {2 {32 6900
+      40 6500
+      48 5700
+      56 5000
+      64 4400}
+   4 {32 6900
+      40 6500
+      48 5700
+      56 5000
+      64 4400}}); (def MIN_DROPOFF_SCORE 5100)
+
+; (def MIN_SHIPS_PER_DROPOFF 13)
+(def MIN_SHIPS_PER_DROPOFF 5)
 ; (def MIN_SHIPS_FOR_FIRST_DROPOFF 10)
 ; (def MIN_SHIPS_FOR_FIRST_DROPOFF_TWO_PLAYER 10)
 (def MAX_MOVE_TO_DROPOFF_DISTANCE 10)
@@ -28,8 +40,8 @@
       48 10
       56 12
       64 11}
-   4 {32 7
-      40 7
+   4 {32 9
+      40 9
       48 11
       56 10
       64 11}})
@@ -152,7 +164,7 @@
         nearby-ships (get-six-range-ships world dropoff)
         my-nearby-count (count (filter #(= my-id (:owner %)) nearby-ships))]
     (+ (* 0.25 score) (* 0.75 uninspired-score) (* 250 my-nearby-count)
-       (- (* 100 dropoff-distance)))))
+       (- (* 300 dropoff-distance)))))
 
 ; (def NUM_POTENTIAL_DROPOFFS 7)
 
@@ -198,7 +210,7 @@
       ; (let [sites (conj (get-cells-within-two-range world last-dropoff-location) last-dropoff-location)
       ;       best-site (first (sort (compare-by :uninspired-score desc :dropoff-distance desc) sites))]
       ;   [best-site])
-  (let [{:keys [top-cells uninspired-cells my-player]} world
+  (let [{:keys [top-cells uninspired-cells my-player num-players width]} world
         num-dropoffs (count (:dropoffs my-player))
         build-dropoff-distance (if (> num-dropoffs 0)
                                  BUILD_DROPOFF_DISTANCE
@@ -207,14 +219,14 @@
                                        (:dropoff-distance %)
                                        MAX_DROPOFF_LOCATION_DISTANCE)
                                    ; (>= (:score %) MIN_DROPOFF_SCORE)
-                                   (>= (:uninspired-score %) MIN_DROPOFF_SCORE)
+                                   (>= (:uninspired-score %) (get-in min-dropoff-score [num-players width]))
                                    (not-terrible-dropoff? world %))
                              uninspired-cells)
         nearby-sites (if (seq nearby-sites)
                        nearby-sites
                        (filter #(and (<= build-dropoff-distance
                                          (:dropoff-distance %))
-                                     (>= (:uninspired-score %) MIN_DROPOFF_SCORE)
+                                     (>= (:uninspired-score %) (get-in min-dropoff-score [num-players width]))
                                      (not-terrible-dropoff? world %))
                                uninspired-cells))]
     (when (seq nearby-sites)
@@ -291,7 +303,7 @@
 (defn choose-dropoff-ship-orig
   "Returns the ship that should build a dropoff."
   [world ships]
-  (let [{:keys [top-cells my-player]} world
+  (let [{:keys [top-cells my-player num-players width]} world
         num-dropoffs (count (:dropoffs my-player))
         build-dropoff-distance (if (> num-dropoffs 0)
                                  BUILD_DROPOFF_DISTANCE
@@ -309,7 +321,7 @@
                         (or (> (:cell-halite ship) AUTO_BUILD_DROPOFF)
                             (and (or (> (:dropoff-distance ship) FAR_DROPOFF)
                                      (> (:score (get-cell world ship))
-                                        (* MIN_DROPOFF_SCORE 1.5)))
+                                        (* (get-in min-dropoff-score [num-players width]) 1.0)))
                                  (not-terrible-dropoff? world ship))))
                       ships)
         furthest-ship (first (sort (compare-by :dropoff-distance desc) ships))

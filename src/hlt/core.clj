@@ -347,7 +347,7 @@
   "Returns a move to collect as much halite as possible."
   [world ship]
   (let [{:keys [my-shipyard try-to-spawn? num-players width quadrant-metrics quadrant-distances
-                valid-quadrants]} world
+                valid-quadrants turns-left]} world
         surrounding-cells (map #(assoc (get-location world ship %) :direction %) SURROUNDING_DIRECTIONS)
         surrounding-cells (if (= 0 (:dropoff-distance (get-cell world ship)))
                             surrounding-cells
@@ -444,8 +444,10 @@
                         best-quadrant (get-best-quadrant world ship needed-halite potential-quadrants turns-to-full)
                         same-quadrant? (= best-quadrant (:quadrant ship))
                   ;;;;;;;;;;;;;
-                        target (if (and (two-player? world)
-                                        (<= width 45))
+                        target (if (or (and (two-player? world)
+                                            (<= width 45)))
+                                       ; (< turns-left CRASH_TURNS_LEFT)
+                                       ; (little-halite-left? world MIN_CRASH_FOR_HALITE))
                                  (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
                                  (get-top-cell-target world ship))
                         ; target (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
@@ -754,7 +756,8 @@
 (defn get-top-cells
   "Returns the top pct cells by score"
   [world pct]
-  (let [{:keys [cells width height ship-location-map my-id turns-left my-ship-count]} world
+  (let [{:keys [cells width height ship-location-map my-id turns-left my-ship-count num-players
+                width]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
         cells (remove #(when-let [ship (get ship-location-map (select-keys % [:x :y]))]
@@ -783,7 +786,8 @@
                              cells))]
     [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
                                                                       best-cells)))
-     (take num-cells-to-return (sort (compare-by :uninspired-score desc) cells))]))
+     ; (take num-cells-to-return (sort (compare-by :uninspired-score desc) cells))
+     (filter #(>= (:uninspired-score %) (get-in min-dropoff-score [num-players width])) cells)]))
 
 (defn remove-bad-targets
   "If my current cell is better than my target - get rid of my target."
