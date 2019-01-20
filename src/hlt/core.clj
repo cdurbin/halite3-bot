@@ -331,17 +331,29 @@
       (and (safe-location? world ship location)
            (can-reach-cell? world ship cell SURROUNDING_DIRECTIONS)))))
 
+; (def best-direction-fn
+;   {2 {32 get-best-direction
+;       40 get-best-direction
+;       48 get-best-direction
+;       56 get-best-direction
+;       64 get-best-gather-direction}
+;    4 {32 get-best-gather-direction
+;       40 get-best-gather-direction
+;       48 get-best-gather-direction
+;       56 get-best-gather-direction
+;       64 get-best-gather-direction}})
+
 (def best-direction-fn
   {2 {32 get-best-direction
       40 get-best-direction
       48 get-best-direction
       56 get-best-direction
-      64 get-best-gather-direction}
-   4 {32 get-best-gather-direction
-      40 get-best-gather-direction
-      48 get-best-gather-direction
-      56 get-best-gather-direction
-      64 get-best-gather-direction}})
+      64 get-best-direction}
+   4 {32 get-best-direction
+      40 get-best-direction
+      48 get-best-direction
+      56 get-best-direction
+      64 get-best-direction}})
 
 (defn get-collect-move
   "Returns a move to collect as much halite as possible."
