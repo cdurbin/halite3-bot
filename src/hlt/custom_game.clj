@@ -288,7 +288,8 @@
 (defn get-inspire-delta-by-move
   "Returns the amount of inspire this move would add or subtract."
   [world ship cell]
-  (if-not (two-player? world)
+  (if (and (not (two-player? world))
+           (> (:width world) 41))
     0
     (let [original-cell (get-cell world ship)]
       (if (= (select-keys original-cell [:x :y]) (select-keys cell [:x :y]))
