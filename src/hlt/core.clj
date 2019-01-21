@@ -90,7 +90,7 @@
 (def NUM_BAN_TURNS 7)
 
 (def get-steal-amount-by-map-size
-  {32 1.0
+  {32 0.75
    40 0.65
    48 0.0
    56 0.1
