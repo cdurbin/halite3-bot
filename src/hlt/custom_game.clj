@@ -288,20 +288,20 @@
 (defn get-inspire-delta-by-move
   "Returns the amount of inspire this move would add or subtract."
   [world ship cell]
-  ; (if-not (two-player? world)
-  ;   0
-  (let [original-cell (get-cell world ship)]
-    (if (= (select-keys original-cell [:x :y]) (select-keys cell [:x :y]))
-      0
-      (let [cost (- (get-opponent-extra-inspire-by-move world original-cell cell)
-                    (get-opponent-lost-inspire-by-move world original-cell cell))]
-        (if (not= 0 cost)
-          (do (log "Turn:" (:turn world) "There's a move to reduce the inspiration - cost was" cost "and cell" (select-keys cell [:x :y]))
-              (flog world cell (str "Inspiration cost:" cost) :brown)
-              (if (> (Math/abs ^Integer cost) 5)
-                cost
-                0))
-          cost)))))
+  (if-not (two-player? world)
+    0
+    (let [original-cell (get-cell world ship)]
+      (if (= (select-keys original-cell [:x :y]) (select-keys cell [:x :y]))
+        0
+        (let [cost (- (get-opponent-extra-inspire-by-move world original-cell cell)
+                      (get-opponent-lost-inspire-by-move world original-cell cell))]
+          (if (not= 0 cost)
+            (do (log "Turn:" (:turn world) "There's a move to reduce the inspiration - cost was" cost "and cell" (select-keys cell [:x :y]))
+                (flog world cell (str "Inspiration cost:" cost) :brown)
+                (if (> (Math/abs ^Integer cost) 5)
+                  cost
+                  0))
+            cost))))))
 
 (defn banned-cell?
   "Returns true if the cell has been banned for dropoff ships."
