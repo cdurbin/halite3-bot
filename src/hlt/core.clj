@@ -79,8 +79,8 @@
       48 830
       56 840
       64 850}
-   4 {32 590
-      40 640
+   4 {32 380
+      40 480
       48 500
       56 820
       64 835}})
@@ -90,8 +90,8 @@
 (def NUM_BAN_TURNS 7)
 
 (def get-steal-amount-by-map-size
-  {32 0.92
-   40 0.65
+  {32 0.2
+   40 0.15
    48 0.0
    56 0.0
    64 0.0})
@@ -469,11 +469,12 @@
                                                       (when (< distance (inc turns-to-full))
                                                         {:quadrant quadrant-num :distance distance})))
                                                   valid-quadrants)
-                        best-quadrant (get-best-quadrant world ship needed-halite potential-quadrants turns-to-full)
+                        best-quadrant (when (two-player? world)
+                                        (get-best-quadrant world ship needed-halite potential-quadrants turns-to-full))
                         same-quadrant? (= best-quadrant (:quadrant ship))
                   ;;;;;;;;;;;;;
                         target (if  (and (two-player? world)
-                                         (<= width 41))
+                                         (<= width 60))
                                        ; (< turns-left CRASH_TURNS_LEFT)
                                          ; (little-halite-left? world MIN_CRASH_FOR_HALITE))
                                  (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
@@ -806,11 +807,11 @@
                            (< width 35)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
                            (< turns-left CRASH_TURNS_LEFT)
-                           (< my-ship-count 6))
+                           (< my-ship-count 10))
                      cells
                      (filter (fn [cell]
                                (let [nearby-ships (get-five-range-ships world cell)]
-                                 (when (< (count nearby-ships) 6)
+                                 (when (< (count nearby-ships) 10)
                                    cell)))
                              cells))]
     [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
