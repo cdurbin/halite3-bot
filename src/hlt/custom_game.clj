@@ -681,12 +681,12 @@
         ; _ (log "Changed locations are:" changed-locations)
         ; _ (log "Potential locations are:" potential-locations)
         inspire-update-cells (map #(inspire-cell world %) potential-locations)
-        cells (combine-cells inspire-update-cells cells)
-        quadrant-metrics (get-quadrant-metrics (assoc world :cells cells))]
+        cells (combine-cells inspire-update-cells cells)]
+        ; quadrant-metrics (get-quadrant-metrics (assoc world :cells cells))]
     ; (log "QM:" quadrant-metrics)
     (assoc world :updated-cells updated-cells :potential-locations potential-locations
-          :other-player-ships other-player-ships :cells cells
-          :quadrant-metrics quadrant-metrics)))
+          :other-player-ships other-player-ships :cells cells)))
+          ; :quadrant-metrics quadrant-metrics)))
 
 (defn unwind-collisions
   "Any time there is a collision try to back out moves until there is no longer a collision."

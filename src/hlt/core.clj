@@ -83,7 +83,7 @@
       40 640
       48 500
       56 820
-      64 845}})
+      64 835}})
 
 (def DELTA_CARRY 500)
 (def MAX_REWINDS 22)
@@ -473,7 +473,7 @@
                         same-quadrant? (= best-quadrant (:quadrant ship))
                   ;;;;;;;;;;;;;
                         target (if  (and (two-player? world)
-                                         (<= width 38))
+                                         (<= width 41))
                                        ; (< turns-left CRASH_TURNS_LEFT)
                                          ; (little-halite-left? world MIN_CRASH_FOR_HALITE))
                                  (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
@@ -663,7 +663,7 @@
                   moves (conj moves move)]
               {:world (assoc world
                              :top-cells updated-top-cells
-                             ; :quadrant-metrics quadrant-metrics
+                             :quadrant-metrics quadrant-metrics
                              :my-player (assoc (:my-player world) :ships updated-ships)
                              :banned-cells banned-cells)
                :moves moves}))
