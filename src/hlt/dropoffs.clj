@@ -38,7 +38,7 @@
       40 6000
       48 5700
       56 5000
-      64 4400}}); (def MIN_DROPOFF_SCORE 5100)
+      64 5000}}); (def MIN_DROPOFF_SCORE 5100)
 
 ; (def MIN_SHIPS_PER_DROPOFF 13)
 (def MIN_SHIPS_PER_DROPOFF 10)
@@ -68,7 +68,7 @@
       40 7
       48 7
       56 12
-      64 17}})
+      64 12}})
 
 (def FAR_DROPOFF 25)
 (def AUTO_BUILD_DROPOFF 2500)

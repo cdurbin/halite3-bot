@@ -83,7 +83,7 @@
       40 480
       48 500
       56 820
-      64 835}})
+      64 800}})
 
 (def DELTA_CARRY 500)
 (def MAX_REWINDS 22)
@@ -807,11 +807,11 @@
                            (< width 35)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
                            (< turns-left CRASH_TURNS_LEFT)
-                           (< my-ship-count 10))
+                           (< my-ship-count 6))
                      cells
                      (filter (fn [cell]
                                (let [nearby-ships (get-five-range-ships world cell)]
-                                 (when (< (count nearby-ships) 10)
+                                 (when (< (count nearby-ships) 6)
                                    cell)))
                              cells))]
     [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
