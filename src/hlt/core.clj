@@ -63,10 +63,10 @@
 
 (def halite-burn-map
   {2 {32 16
-      40 16
-      48 16
-      56 100
-      64 100}
+      40 14
+      48 14
+      56 12
+      64 12}
    4 {32 100
       40 100
       48 100
@@ -79,7 +79,7 @@
       48 830
       56 840
       64 850}
-   4 {32 610
+   4 {32 620
       40 640
       48 500
       56 880
@@ -90,7 +90,7 @@
 (def NUM_BAN_TURNS 7)
 
 (def get-steal-amount-by-map-size
-  {32 0.75
+  {32 0.92
    40 0.65
    48 0.0
    56 0.1
@@ -335,12 +335,14 @@
 (defn should-mine-cell?
   "Returns true if I should try to mine a cell."
   [world ship cell location]
-  (let [{:keys [my-id turns-left]} world]
+  (let [{:keys [my-id turns-left width]} world]
     (if (two-player? world)
       (and (or (nil? (:ship cell))
                (not= my-id (-> cell :ship :owner)))
+           ; (or (< width 35)
            (can-reach-cell? world ship cell SURROUNDING_DIRECTIONS))
       (and (safe-location? world ship location)
+           ; (or (< width 35)
            (can-reach-cell? world ship cell SURROUNDING_DIRECTIONS)))))
 
 ; (def best-direction-fn
@@ -451,7 +453,9 @@
                              :ship (assoc ship :quadrant (cell->quadrant (select-keys ram-cell [:x :y])))
                              :reason "Ramming ship."))
                   ;; TODO insert quadrant specific logic
-                  (let [current-quadrant-metrics (get quadrant-metrics (:quadrant ship))
+                  (let [
+
+                        current-quadrant-metrics (get quadrant-metrics (:quadrant ship))
                         ; _ (log "CQM: " (pr-str current-quadrant-metrics))
                         ; avg-gather-amount-per-cell (* inverse-cells-per-quadrant
                         ;                               (+ (:total-halite current-quadrant-metrics)
@@ -468,12 +472,13 @@
                         best-quadrant (get-best-quadrant world ship needed-halite potential-quadrants turns-to-full)
                         same-quadrant? (= best-quadrant (:quadrant ship))
                   ;;;;;;;;;;;;;
-                        target (if (or (and (two-player? world)
-                                            (<= width 45)))
+                        target (if  (and (two-player? world)
+                                         (<= width 38))
                                        ; (< turns-left CRASH_TURNS_LEFT)
-                                       ; (little-halite-left? world MIN_CRASH_FOR_HALITE))
+                                         ; (little-halite-left? world MIN_CRASH_FOR_HALITE))
                                  (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
                                  (get-top-cell-target world ship))
+                        ; target (get-top-cell-target world ship)
                         ; target (get-in quadrant-metrics [best-quadrant :top-scoring-cell])
                         ; target (if same-quadrant?
                         ;          orig-target
@@ -658,7 +663,7 @@
                   moves (conj moves move)]
               {:world (assoc world
                              :top-cells updated-top-cells
-                             :quadrant-metrics quadrant-metrics
+                             ; :quadrant-metrics quadrant-metrics
                              :my-player (assoc (:my-player world) :ships updated-ships)
                              :banned-cells banned-cells)
                :moves moves}))
@@ -1088,7 +1093,7 @@
                          :min-uninspired-score min-uninspired-score)
             ; updated-dropoff-cells (decorate-dropoff-cells world (conj (:dropoffs my-player) my-shipyard))
             ; cells (merge cells updated-dropoff-cells)
-            build-dropoff-distance (get-dropoff-distance (count (:dropoffs my-player)))
+            build-dropoff-distance (get-dropoff-distance world (count (:dropoffs my-player)))
             dropoff-location (when (and last-dropoff-location
                                         (>= (:dropoff-distance (get-cell world last-dropoff-location))
                                             build-dropoff-distance))

@@ -10,7 +10,19 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;; Dropoff management
-(def FIRST_BUILD_DROPOFF_DISTANCE 15)
+(def first-build-dropoff-distance
+  {2 {32 15
+      40 15
+      48 15
+      56 15
+      64 15}
+   4 {32 13
+      40 14
+      48 15
+      56 15
+      64 15}})
+
+; (def FIRST_BUILD_DROPOFF_DISTANCE 15)
 (def BUILD_DROPOFF_DISTANCE 15)
 (def MAX_DROPOFF_LOCATION_DISTANCE 40)
 ; (def NUM_POTENTIAL_DROPOFFS 1)
@@ -47,15 +59,15 @@
       64 11}})
 
 (def num-potential-dropoffs
-  {2 {32 5
-      40 5
-      48 5
+  {2 {32 7
+      40 7
+      48 7
       56 17
       64 17}
    4 {32 7
       40 7
       48 7
-      56 5
+      56 12
       64 17}})
 
 (def FAR_DROPOFF 25)
@@ -91,10 +103,11 @@
 
 (defn get-dropoff-distance
   "Returns the number of cells between dropoffs to decide what to build."
-  [num-dropoffs]
-  (if (> num-dropoffs 0)
-    BUILD_DROPOFF_DISTANCE
-    FIRST_BUILD_DROPOFF_DISTANCE))
+  [world num-dropoffs]
+  (let [{:keys [width num-players]} world]
+    (if (> num-dropoffs 0)
+      BUILD_DROPOFF_DISTANCE
+      (get-in first-build-dropoff-distance [num-players width]))))
 
 (defn not-terrible-dropoff?
   "Returns true if I have more ships around a cell (or there are no nearby ships)."
@@ -212,9 +225,7 @@
       ;   [best-site])
   (let [{:keys [top-cells uninspired-cells my-player num-players width]} world
         num-dropoffs (count (:dropoffs my-player))
-        build-dropoff-distance (if (> num-dropoffs 0)
-                                 BUILD_DROPOFF_DISTANCE
-                                 FIRST_BUILD_DROPOFF_DISTANCE)
+        build-dropoff-distance (get-dropoff-distance world num-dropoffs)
         nearby-sites (filter #(and (<= build-dropoff-distance
                                        (:dropoff-distance %)
                                        MAX_DROPOFF_LOCATION_DISTANCE)
@@ -305,9 +316,7 @@
   [world ships]
   (let [{:keys [top-cells my-player num-players width]} world
         num-dropoffs (count (:dropoffs my-player))
-        build-dropoff-distance (if (> num-dropoffs 0)
-                                 BUILD_DROPOFF_DISTANCE
-                                 FIRST_BUILD_DROPOFF_DISTANCE)
+        build-dropoff-distance (get-dropoff-distance world num-dropoffs)
         top-locations (map #(select-keys % [:x :y]) top-cells)
         ships (filter (fn [ship]
                         (and (>= (+ (:halite my-player) (:halite ship) (:cell-halite ship))
