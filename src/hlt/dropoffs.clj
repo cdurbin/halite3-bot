@@ -16,7 +16,7 @@
       48 15
       56 15
       64 15}
-   4 {32 13
+   4 {32 14
       40 14
       48 15
       56 15
@@ -230,14 +230,14 @@
                                        (:dropoff-distance %)
                                        MAX_DROPOFF_LOCATION_DISTANCE)
                                    ; (>= (:score %) MIN_DROPOFF_SCORE)
-                                   (>= (:uninspired-score %) (get-in min-dropoff-score [num-players width]))
+                                   ; (>= (:uninspired-score %) (get-in min-dropoff-score [num-players width]))
                                    (not-terrible-dropoff? world %))
                              uninspired-cells)
         nearby-sites (if (seq nearby-sites)
                        nearby-sites
                        (filter #(and (<= build-dropoff-distance
                                          (:dropoff-distance %))
-                                     (>= (:uninspired-score %) (get-in min-dropoff-score [num-players width]))
+                                     ; (>= (:uninspired-score %) (get-in min-dropoff-score [num-players width]))
                                      (not-terrible-dropoff? world %))
                                uninspired-cells))]
     (when (seq nearby-sites)

@@ -79,7 +79,7 @@
       48 830
       56 840
       64 850}
-   4 {32 380
+   4 {32 400
       40 480
       48 500
       56 820
@@ -787,7 +787,7 @@
   "Returns the top pct cells by score"
   [world pct]
   (let [{:keys [cells width height ship-location-map my-id turns-left my-ship-count num-players
-                width]} world
+                width my-player]} world
         num-cells-to-return (Math/floor (* width height pct 0.01))
         cells (vals cells)
         cells (remove #(when-let [ship (get ship-location-map (select-keys % [:x :y]))]
@@ -803,21 +803,31 @@
 
         ; cells (filter #(> (:halite %) 150)
         ;               (vals cells))
+        max-num-ships (if (= 64 width)
+                        6
+                        10)
         best-cells (if (or (two-player? world)
                            (< width 35)
                            (little-halite-left? world MIN_CRASH_FOR_HALITE)
                            (< turns-left CRASH_TURNS_LEFT)
-                           (< my-ship-count 6))
+                           (< my-ship-count max-num-ships))
                      cells
                      (filter (fn [cell]
                                (let [nearby-ships (get-five-range-ships world cell)]
-                                 (when (< (count nearby-ships) 6)
+                                 (when (< (count nearby-ships) max-num-ships)
                                    cell)))
-                             cells))]
+                             cells))
+        uninspired-cells (filter #(>= (:uninspired-score %) (get-in min-dropoff-score [num-players width])) cells)]
+        ; uninspired-cells (if (or (two-player? world)
+        ;                          (> (count (:dropoffs my-player)) 0)
+        ;                          (seq uninspired-cells))
+        ;                    uninspired-cells
+        ;                    (do (log "CDD-FOUND IT")
+        ;                        [(first (sort (compare-by :uninspired-score desc) cells))]))]
     [(take num-cells-to-return (sort (compare-by :score desc) (remove #(get ship-location-map (select-keys % [:x :y]))
                                                                       best-cells)))
      ; (take num-cells-to-return (sort (compare-by :uninspired-score desc) cells))
-     (filter #(>= (:uninspired-score %) (get-in min-dropoff-score [num-players width])) cells)]))
+     uninspired-cells]))
 
 (defn remove-bad-targets
   "If my current cell is better than my target - get rid of my target."
@@ -1159,8 +1169,8 @@
                                 (filter #(= :dropoff (:mode %)) other-ships))
 
             dropoff-advance-ships (get-dropoff-advance-ships world dropoff-ships)
-            _ (doseq [s dropoff-advance-ships]
-                (flog-color world s "ADVANCE" :yellow))
+            ; _ (doseq [s dropoff-advance-ships]
+            ;     (flog-color world s "ADVANCE" :yellow))
             dropoff-ships (reduce (fn [ships next-advance-ship]
                                     (decorate-advance-dropoff-ships next-advance-ship ships))
                                   dropoff-ships
