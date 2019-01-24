@@ -120,53 +120,6 @@
     ; (or (> my-ship-count 7)
     (>= my-ship-count other-ship-count)))
 
-; (defn choose-dropoff-locations
-;   "Given a bunch of choices for dropoff locations. Choose the one(s) that could be the most
-;   valuable."
-;   [world last-dropoff-location]
-;   (let [{:keys [my-player reserve]} world
-;         num-dropoffs (count (:dropoffs my-player))
-;         build-dropoff-distance (if (> num-dropoffs 0)
-;                                  BUILD_DROPOFF_DISTANCE
-;                                  FIRST_BUILD_DROPOFF_DISTANCE)
-;         last-dropoff-location (get-cell world last-dropoff-location)]
-;     (if (and last-dropoff-location
-;              ; false ;; see what happens if I let my ships build anywhere
-;              (not (at-enemy-dropoff? world last-dropoff-location))
-;              (not-terrible-dropoff? world last-dropoff-location))
-;              ; (> (:score last-dropoff-location) (- MIN_DROPOFF_SCORE 2000))
-;              ; (> (:uninspired-score last-dropoff-location) (- MIN_DROPOFF_SCORE 1000))
-;              ; (>= (:dropoff-distance last-dropoff-location) build-dropoff-distance))
-;       [last-dropoff-location]
-;       ; (let [sites (conj (get-cells-within-two-range world last-dropoff-location) last-dropoff-location)
-;       ;       best-site (first (sort (compare-by :uninspired-score desc :dropoff-distance desc) sites))]
-;       ;   [best-site])
-;       (let [{:keys [top-cells]} world
-;             nearby-sites (filter #(and (<= build-dropoff-distance
-;                                            (:dropoff-distance %)
-;                                            MAX_DROPOFF_LOCATION_DISTANCE)
-;                                        ; (>= (:score %) MIN_DROPOFF_SCORE)
-;                                        (>= (:uninspired-score %) MIN_DROPOFF_SCORE)
-;                                        (not-terrible-dropoff? world %))
-;                                  top-cells)
-;             nearby-sites (if (seq nearby-sites)
-;                            nearby-sites
-;                            (filter #(and (<= build-dropoff-distance
-;                                              (:dropoff-distance %))
-;                                          (>= (:uninspired-score %) MIN_DROPOFF_SCORE)
-;                                          (not-terrible-dropoff? world %))
-;                                    top-cells))
-;             - (log (format "Turn %d potential dropoff locations %s" (:turn world)
-;                          ; (pr-str (take NUM_POTENTIAL_DROPOFFS (map #(select-keys % [:x :y]) (sort (compare-by :score desc) nearby-sites))))
-;                            (pr-str (take NUM_POTENTIAL_DROPOFFS (map #(select-keys % [:x :y]) (sort (compare-by :uninspired-score desc) nearby-sites))))))
-;             ; (take NUM_POTENTIAL_DROPOFFS (sort (compare-by :score desc) nearby-sites))
-;             dropoffs (take NUM_POTENTIAL_DROPOFFS (sort (compare-by :dropoff-distance asc :uninspired-score desc) nearby-sites))
-;             ;; TODO work with multiple dropoffs later
-;             dropoff (first dropoffs)
-;             {:keys [ship distance]} (when dropoff
-;                                       (find-closest-ship world dropoff (-> world :my-player :ships)))]
-;         (when (and ship (< distance MAX_MOVE_TO_DROPOFF_DISTANCE))
-;           [dropoff])))))
 
 (defn custom-dropoff-score
   "Scores a dropoff. Takes the score, uninspired-score, dropoff distance,
@@ -178,20 +131,6 @@
         my-nearby-count (count (filter #(= my-id (:owner %)) nearby-ships))]
     (+ (* 0.25 score) (* 0.75 uninspired-score) (* 250 my-nearby-count)
        (- (* 300 dropoff-distance)))))
-
-; (def NUM_POTENTIAL_DROPOFFS 7)
-
-; (def num-potential-dropoffs
-;   {2 {32 5
-;       40 6
-;       48 7
-;       56 7
-;       64 7}
-;    4 {32 5
-;       40 5
-;       48 7
-;       56 6
-;       64 20}})
 
 (defn choose-best-dropoffs
   "Returns the best dropoff from a list of dropoff locations."
@@ -206,23 +145,6 @@
   "Given a bunch of choices for dropoff locations. Choose the one(s) that could be the most
   valuable."
   [world last-dropoff-location]
-  ; (let [{:keys [my-player reserve]} world
-  ;       num-dropoffs (count (:dropoffs my-player))
-  ;       build-dropoff-distance (if (> num-dropoffs 0)
-  ;                                BUILD_DROPOFF_DISTANCE
-  ;                                FIRST_BUILD_DROPOFF_DISTANCE)
-  ;       last-dropoff-location (get-cell world last-dropoff-location)]
-  ;   (if (and last-dropoff-location
-  ;            ; false ;; see what happens if I let my ships build anywhere
-  ;            (not (at-enemy-dropoff? world last-dropoff-location))
-  ;            (not-terrible-dropoff? world last-dropoff-location))
-  ;            ; (> (:score last-dropoff-location) (- MIN_DROPOFF_SCORE 2000))
-  ;            ; (> (:uninspired-score last-dropoff-location) (- MIN_DROPOFF_SCORE 1000))
-  ;            ; (>= (:dropoff-distance last-dropoff-location) build-dropoff-distance))
-  ;     [last-dropoff-location]
-      ; (let [sites (conj (get-cells-within-two-range world last-dropoff-location) last-dropoff-location)
-      ;       best-site (first (sort (compare-by :uninspired-score desc :dropoff-distance desc) sites))]
-      ;   [best-site])
   (let [{:keys [top-cells uninspired-cells my-player num-players width]} world
         num-dropoffs (count (:dropoffs my-player))
         build-dropoff-distance (get-dropoff-distance world num-dropoffs)
@@ -242,17 +164,6 @@
                                uninspired-cells))]
     (when (seq nearby-sites)
       (choose-best-dropoffs world nearby-sites))))
-    ;     - (log (format "Turn %d potential dropoff locations %s" (:turn world)
-    ;                  ; (pr-str (take NUM_POTENTIAL_DROPOFFS (map #(select-keys % [:x :y]) (sort (compare-by :score desc) nearby-sites))))
-    ;                    (pr-str (take NUM_POTENTIAL_DROPOFFS (map #(select-keys % [:x :y]) (sort (compare-by :uninspired-score desc) nearby-sites))))))
-    ;     ; (take NUM_POTENTIAL_DROPOFFS (sort (compare-by :score desc) nearby-sites))
-    ;     dropoffs (take NUM_POTENTIAL_DROPOFFS (sort (compare-by :dropoff-distance asc :uninspired-score desc) nearby-sites))
-    ;     ;; TODO work with multiple dropoffs later
-    ;     dropoff (first dropoffs)
-    ;     {:keys [ship distance]} (when dropoff
-    ;                               (find-closest-ship world dropoff (-> world :my-player :ships)))]
-    ; (when (and ship (< distance MAX_MOVE_TO_DROPOFF_DISTANCE))
-    ;   [dropoff])))
 
 (defn should-build-dropoff?
   "Returns true if it makes sense for me to build a dropoff."
@@ -278,7 +189,6 @@
           (or (seq dropoff-locations)
               (> (/ total-halite total-ship-count) (get-in min-per-ship-to-build-dropoff [num-players width]))))))
 
-; (def NUM_DROPOFF_SHIPS 6)
 (defn assign-dropoff-moves
   "Returns moves to go towards a dropoff. For now just always assume there is one dropoff."
   [world]
@@ -391,14 +301,6 @@
       (if-let [second-choice (choose-dropoff-ship-orig world (:ships my-player))]
         second-choice
         (useful-dropoff-location world))
-      ; (let [ships (filter (fn [ship]
-      ;                       (and (not (at-enemy-dropoff? world ship))
-      ;                            (>= (+ (:halite my-player) (:halite ship) (:cell-halite ship))
-      ;                                DROPOFF_COST)
-      ;                            (some (set [(select-keys ship [:x :y])])
-      ;                                  dropoff-locations)))
-      ;                     (:ships my-player))]
-        ; (first (sort (compare-by :score desc) ships))
       (first (sort (compare-by :score desc :dropoff-distance desc) ships)))))
 
 (defn update-world-for-dropoff-ship

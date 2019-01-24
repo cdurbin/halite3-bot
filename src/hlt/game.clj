@@ -333,12 +333,6 @@
   [world]
   (= 2 (:num-players world)))
 
-; (defn enough-spawn-halite?
-;   "Returns true if I have enough halite to spawn a ship."
-;   [world constants]
-;   (let [{:keys [my-player reserve]} world]
-;     (>= (:halite my-player) (+ (get constants "NEW_ENTITY_ENERGY_COST") reserve))))
-
 (defn enough-spawn-halite?
   "Returns true if I have enough halite to spawn a ship."
   [world]

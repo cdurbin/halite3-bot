@@ -225,9 +225,3 @@
                        potential-quadrants)]
     ; (log "Quadrants are:" (pr-str quadrants))
     (:quadrant (first (sort (compare-by :turns asc :distance asc) quadrants)))))
-
-(comment
- (group-by :a
-   [{:a 1 :b "C" :c "DDD"}
-    {:a 1 :b "8" :c 9}
-    {:a 2 :b 3}]))

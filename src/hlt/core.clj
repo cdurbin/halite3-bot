@@ -213,21 +213,6 @@
                                          cells)))]
     (:direction closest-target)))
 
-;; TODO I don't think anything should actually call this
-; (defn get-best-gather-direction
-;   "Returns the best direction to move to get to a target."
-;   [world ship target cells]
-;   (let [{:keys [width height]} world
-;         closest-target (first (sort (compare-by :cost asc :distance asc :halite desc)
-;                                     (map #(let [distance (distance-between width height target %)]
-;                                             (assoc %
-;                                                    :distance distance
-;                                                    :cost (+ (* 0.1 MOVE_COST (:halite %))
-;                                                             (get-inspire-delta-by-move world ship %)
-;                                                             (- (* 2000 (/ 1 (+ distance 0.5)))))))
-;                                          cells)))]
-;     (:direction closest-target)))
-
 (defn get-best-gather-direction
   "Returns the best direction to move to get to a target."
   [world ship target cells]
@@ -870,89 +855,6 @@
                                                          (not= my-id (:owner ship))))
                                                  (get-two-range-cells world (get-cell world location))))))]
             [location turns]))))
-
-; (defn get-value-of-a-ship
-;   "Note - I will want to change this at some point to take into account the average halite gained
-;   per turn divided by the number of ships. For now just base on total halite on the map and
-;   the number of ships."
-;   [world]
-;   (/ (:total-halite world) (:total-ship-count world)))
-;
-; (defn get-cost-of-wasted-turn
-;   "Returns the cost of wasting a turn by staying STILL."
-;   [world]
-;   (/ (:total-halite world) (:total-ship-count world)))
-;
-; (def odds-of-collision-still 0.2)
-; (def odds-of-collision-moving 0.1)
-;
-; (defn get-ships-in-cells
-;   "Returns ships from cells."
-;   [world locations]
-;   (keep :ship (map #(get-cell world %) locations)))
-;
-; (defn play-out-fight
-;   "Figure out who will collect what from a fight based on looking out up to 7 turns..."
-;   [world cell my-ship their-ship]
-;   (let [;; Include the inspiration bonus. Assume if I'm inspired they are too.
-;         dropped-halite (* (+ (:halite my-ship) (:halite their-ship))
-;                           (if (inspired-cell? world cell)
-;                             3
-;                             1))]
-;     (loop [remaining-halite dropped-halite
-;            iteration 1
-;            total-halite 0
-;            ships (remove #(or (= (:id my-ship) (:id %))
-;                               (= (:id their-ship) (:id %)))
-;                          (get-ships-in-cells (get-in cell [:neighbors 1])))]
-;       (if (or (<= remaining-halite 0)
-;               (> iteration 7))
-;         {:total total-halite :leftover remaining-halite}
-;         (let [[my-carry-capacity other-carry-capacity] (get-carrying-capacity world ships)
-;               delta (long (- my-carry-capacity other-carry-capacity))
-;               delta (if (> (Math/abs delta) remaining-halite)
-;                       (if (> delta 0)
-;                         remaining-halite
-;                         (* -1 remaining-halite))
-;                       delta)
-;               remaining-halite (- remaining-halite delta)
-;               total-halite (long (+ total-halite delta))]
-;           (recur remaining-halite
-;                  (inc iteration)
-;                  total-halite
-;                  (get-ships-in-cells (get-in cell [:neighbors (inc iteration)]))))))))
-;
-; (defn spoils-of-war
-;   "Returns a value of the net halite change from a collision. This could get complicated to
-;   track correctly, but is probably one of the most important things to get right in this game."
-;   [world my-ship cell their-ship]
-;   (let [{:keys [total leftover]} (play-out-fight world cell my-ship their-ship)]
-;     (if (= 0 leftover)
-;       total
-;       (let [my-closest-base (get-closest-cell world cell (:my-dropoffs world))
-;             their-closest-base (get-closest-cell world cell (:enemy-dropoffs world))]
-;         (if (< (:distance my-closest-base) (:distance their-closest-base))
-;           (+ total (* 0.5 leftover))
-;           (if (= (:distance my-closest-base) (:distance their-closest-base))
-;             total
-;             (- total (* 0.5 leftover))))))))
-;
-; (defn score-collision
-;   "Provides a score for choosing the given cell with regards to collision. Positive means
-;   an expected gain from a collision and negative means an expected loss from a collision."
-;   [world ship cell]
-;   (if-let [other-ship (:ship cell)]
-;     (if (= (:my-id world) (:owner other-ship))
-;       (- (* -2 (get-value-of-a-ship world)) (:halite ship) (:halite other-ship))
-;       (let [collisions-odds (if (ghost-ship? (:ship cell))
-;                               0.1
-;                               0.2)]
-;         (if (two-player? world)
-;           (* collisions-odds (spoils-of-war world ship cell other-ship))
-;           (+ (get-value-of-a-ship world)
-;              (* collisions-odds (spoils-of-war world ship cell other-ship))))))
-;     0))
-
 
 (defn score-mining
   "Provides a score for choosing the given cell with regards to mining. All values should
